@@ -129,13 +129,27 @@ else
 fi
 rm -rf "$T"
 
-# Routine one-off work is NOT blocked by an empty sourceOfTruth, but warns loudly.
+# Routine one-off work still needs Stage 8 review; self-review does not count.
 T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
 write_spec "$T" "analysis" "curiosity exploration"
 write_validation "$T" true
 run_gate "$T" "retention-q2"
+if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:missing-review'; then
+  pass "blocks routine work when Stage 8 review is missing"
+else
+  fail "expected missing-review block (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+# Routine one-off work is NOT blocked by an empty sourceOfTruth after review,
+# but warns loudly.
+T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
+write_spec "$T" "analysis" "curiosity exploration"
+write_validation "$T" true
+write_review "$T" 4
+run_gate "$T" "retention-q2"
 if [ "$RC" -eq 0 ] && printf '%s\n' "$ERR" | grep -qi 'sourceOfTruth is not configured'; then
-  pass "passes routine work but warns on unconfigured sourceOfTruth"
+  pass "passes reviewed routine work but warns on unconfigured sourceOfTruth"
 else
   fail "expected pass-with-warning (rc=$RC stdout=$OUT stderr=$ERR)"
 fi

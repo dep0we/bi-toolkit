@@ -2,6 +2,8 @@
 
 The assay loop is built around one belief: a useful number is not enough. The
 number has to be traceable, reconciled, and explained in plain language.
+Exploratory requests like "see what you can do" are still analysis (answering
+with data or numbers), so they enter the loop by default.
 
 ## Define Before Query
 
@@ -21,6 +23,13 @@ group is included, which source wins when two systems disagree.
 Discovery finds those forks before results are computed. If a fork changes a
 number that stakeholders act on, it is escalated.
 
+## Delegate Mechanical Work
+
+Mechanical work means repeatable profiling, counting, and queries. That work
+goes to sub-agents, meaning worker agents given narrow tasks, so the main model
+(the agent leading judgment) can frame, interpret, and synthesize. Running data
+crunching inline on the main model skips the kit's cost and review discipline.
+
 ## Reconcile Before Trusting
 
 Reconciliation means numbers match the official source, or differences are
@@ -31,15 +40,20 @@ The validation receipt records what was compared, where it matched, where it did
 not, and whether the difference is accepted. `validationcheck` enforces that
 receipt before delivery.
 
-## Review in Rounds
+## Independent Review in Rounds
 
 A single review pass misses problems introduced by its own fixes. Rounds force a
 fresh read after changes. The goal is a clean round: one complete review that
-finds no blocking issue.
+finds no blocking issue. The reviewer must be a fresh `red-teamer` sub-agent
+that did not produce the numbers. Self-review, meaning review by the same agent,
+does not count.
 
-For high-stakes work and data products, Stage 8 adds a score. High-stakes means
-the answer drives money, headcount, or strategy. Data products get the same
-strictness because a recurring wrong number repeats every refresh.
+Every non-trivial analysis, meaning not approved as too small to gate, gets that
+independent review before delivery. For high-stakes work and data products,
+Stage 8 also enforces the score threshold (the minimum allowed score).
+High-stakes means the answer drives money, headcount, or strategy. Data
+products get the same score strictness because a recurring wrong number repeats
+every refresh.
 
 ## Plain Language Is a Quality Gate
 

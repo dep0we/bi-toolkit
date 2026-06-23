@@ -75,51 +75,47 @@ if not validation.get("reconciliation"):
 
 spec = load_json(spec_path) or {}
 config = load_jsonc(config_path)
+kind = str(spec.get("kind", "")).lower()
 impact = " ".join(str(spec.get(k, "")) for k in ("decisionImpact", "highStakesReason")).lower()
 track = str(spec.get("track", "")).lower()
 high = spec.get("highStakes") is True or any(w in impact for w in ("money", "headcount", "strategy"))
 data_product = track in ("data-product", "data_product", "dataproduct")
-needs_review = high or data_product
+needs_review = kind != "trivial"
 
 sot = config.get("sourceOfTruth") if isinstance(config, dict) else None
 sot_configured = isinstance(sot, dict) and len(sot) > 0
 
-if not needs_review:
-    # Routine one-off work: never blocked on config, but warn if the official
-    # comparison source was never set (intake skipped).
-    print("ok" if sot_configured else "ok-warn-sot")
-    raise SystemExit
-
-if not sot_configured:
+if (high or data_product) and not sot_configured:
     # High-stakes or data-product work cannot claim a source-of-truth tie when
     # no source-of-truth is configured. Make intake required in practice here.
     print("source-of-truth-unconfigured")
     raise SystemExit
 
-review = load_json(review_path)
-if not review:
-    print("missing-review")
-    raise SystemExit
-if review.get("kind") != "adversarial-review":
-    print("invalid-review")
-    raise SystemExit
+if needs_review:
+    review = load_json(review_path)
+    if not review:
+        print("missing-review")
+        raise SystemExit
+    if review.get("kind") != "adversarial-review":
+        print("invalid-review")
+        raise SystemExit
 
-thresholds = config.get("scoreThresholds", {}) if isinstance(config, dict) else {}
-threshold = int(thresholds.get("defaultMinDimension", 3))
-scores = review.get("scores") or {}
-required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"]
-missing = [k for k in required if k not in scores]
-if missing:
-    print("missing-score")
-    raise SystemExit
-low = [k for k in required if not isinstance(scores.get(k), (int, float)) or scores.get(k) < threshold]
-if low:
-    if review.get("acceptedBelowThreshold") is True and isinstance(review.get("acceptanceReason"), str) and review["acceptanceReason"].strip():
-        print("ok")
-    else:
-        print("sub-threshold-score")
-    raise SystemExit
-print("ok")
+    thresholds = config.get("scoreThresholds", {}) if isinstance(config, dict) else {}
+    threshold = int(thresholds.get("defaultMinDimension", 3))
+    scores = review.get("scores") or {}
+    required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"]
+    missing = [k for k in required if k not in scores]
+    if missing:
+        print("missing-score")
+        raise SystemExit
+    low = [k for k in required if not isinstance(scores.get(k), (int, float)) or scores.get(k) < threshold]
+    if low:
+        if review.get("acceptedBelowThreshold") is True and isinstance(review.get("acceptanceReason"), str) and review["acceptanceReason"].strip():
+            print("ok" if sot_configured else "ok-warn-sot")
+        else:
+            print("sub-threshold-score")
+        raise SystemExit
+print("ok" if sot_configured else "ok-warn-sot")
 PY
 )"
 elif command -v node >/dev/null 2>&1; then
@@ -147,28 +143,31 @@ if (validation.reconciled !== true) { console.log("unreconciled"); process.exit(
 if (!validation.reconciliation) { console.log("missing-reconciliation"); process.exit(0); }
 const spec = load(specPath) || {};
 const config = loadJsonc(configPath);
+const kind = String(spec.kind || "").toLowerCase();
 const impact = `${spec.decisionImpact || ""} ${spec.highStakesReason || ""}`.toLowerCase();
 const track = String(spec.track || "").toLowerCase();
 const high = spec.highStakes === true || ["money", "headcount", "strategy"].some((w) => impact.includes(w));
 const dataProduct = ["data-product", "data_product", "dataproduct"].includes(track);
+const needsReview = kind !== "trivial";
 const sot = config.sourceOfTruth;
 const sotConfigured = sot && typeof sot === "object" && !Array.isArray(sot) && Object.keys(sot).length > 0;
-if (!high && !dataProduct) { console.log(sotConfigured ? "ok" : "ok-warn-sot"); process.exit(0); }
-if (!sotConfigured) { console.log("source-of-truth-unconfigured"); process.exit(0); }
-const review = load(reviewPath);
-if (!review) { console.log("missing-review"); process.exit(0); }
-if (review.kind !== "adversarial-review") { console.log("invalid-review"); process.exit(0); }
-const threshold = Number((config.scoreThresholds || {}).defaultMinDimension || 3);
-const scores = review.scores || {};
-const required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"];
-if (!required.every((k) => Object.prototype.hasOwnProperty.call(scores, k))) { console.log("missing-score"); process.exit(0); }
-const low = required.filter((k) => typeof scores[k] !== "number" || scores[k] < threshold);
-if (low.length) {
-  if (review.acceptedBelowThreshold === true && typeof review.acceptanceReason === "string" && review.acceptanceReason.trim()) console.log("ok");
-  else console.log("sub-threshold-score");
-  process.exit(0);
+if ((high || dataProduct) && !sotConfigured) { console.log("source-of-truth-unconfigured"); process.exit(0); }
+if (needsReview) {
+  const review = load(reviewPath);
+  if (!review) { console.log("missing-review"); process.exit(0); }
+  if (review.kind !== "adversarial-review") { console.log("invalid-review"); process.exit(0); }
+  const threshold = Number((config.scoreThresholds || {}).defaultMinDimension || 3);
+  const scores = review.scores || {};
+  const required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"];
+  if (!required.every((k) => Object.prototype.hasOwnProperty.call(scores, k))) { console.log("missing-score"); process.exit(0); }
+  const low = required.filter((k) => typeof scores[k] !== "number" || scores[k] < threshold);
+  if (low.length) {
+    if (review.acceptedBelowThreshold === true && typeof review.acceptanceReason === "string" && review.acceptanceReason.trim()) console.log(sotConfigured ? "ok" : "ok-warn-sot");
+    else console.log("sub-threshold-score");
+    process.exit(0);
+  }
 }
-console.log("ok");
+console.log(sotConfigured ? "ok" : "ok-warn-sot");
 NODE
 )"
 else
@@ -199,7 +198,7 @@ case "$STATUS" in
     gate "unreconciled" "The result has not reconciled to source-of-truth. Source-of-truth means the official place to compare against."
     ;;
   missing-review)
-    gate "missing-review" "This work is high-stakes, meaning it drives major business choices, or a data product, meaning a recurring report or dashboard. Stage 8 review and scoring are required before delivery."
+    gate "missing-review" "This non-trivial analysis, meaning not approved as too small to gate, is missing Stage 8 review and scoring. A fresh red-teamer sub-agent, meaning a worker agent given a narrow task, must review it before delivery. Self-review does not count."
     ;;
   invalid-review|missing-score)
     gate "invalid-review" "The Stage 8 review receipt must include scores for confidence (how sure the answer is right), data completeness (how much relevant data was present), methodology soundness (whether the approach survives expert review), and reproducibility (can someone re-run the same work)."

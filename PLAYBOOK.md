@@ -1,8 +1,20 @@
 # The Assay Playbook
 
-This is the operating manual for shipping trustworthy analysis with AI. The rule
-is simple: every stage runs by default. Claude may propose skipping a stage only
-with a plain reason and your explicit approval. Silent skips are defects.
+This is the operating manual for shipping trustworthy analysis with AI. The
+assay loop (staged checks for BI answers) has a simple rule: every stage runs by
+default. Claude may propose skipping a stage only with a plain reason and your
+explicit approval. Silent skips are defects. A request to "see what you can do"
+or find numbers is analysis (answering with data or numbers) and enters the loop
+by default.
+
+## Non-Negotiable Disciplines
+
+- Route through the loop by default; inline answers require a named exception
+  and your explicit approval.
+- Validate with a fresh `red-teamer` sub-agent, meaning a worker agent given a
+  narrow task. Self-review, meaning review by the same agent, does not count.
+- Delegate mechanical work, meaning repeatable profiling, counting, and queries,
+  to `eda-profiler` and `query-runner` sub-agents.
 
 ## Lifecycle
 
@@ -15,9 +27,9 @@ with a plain reason and your explicit approval. Silent skips are defects.
 | 4 | Profile Data | Analysis | Inspect tables, missing values, joins, and suspicious data. | - |
 | 4d | Design Product | Data Product | Choose layout, metrics, refresh rhythm, access, and semantic layer (shared metric definitions). | - |
 | 5 | Discovery | Analysis | Lock methodology forks before results are computed. | - |
-| 6 | Execute | Shared | Run the analysis or build the report using the locked decisions. | `questioncheck` |
-| 7 | Validate | Shared | Reconcile results to source-of-truth, meaning numbers match the official source or differences are explained. | Required before Stage 9 |
-| 8 | Review + Score | Shared | Red-team the conclusion and score confidence, completeness, methodology, and reproducibility. | Required for high-stakes work and data products |
+| 6 | Execute | Shared | Run the analysis or build the report using the locked decisions. Delegate profiling, counting, and queries to worker sub-agents. | `questioncheck` |
+| 7 | Validate | Shared | Reconcile results to source-of-truth, meaning numbers match the official source or differences are explained. Use the `reconciler` sub-agent; do not self-check. | Required before Stage 9 |
+| 8 | Review + Score | Shared | Red-team the conclusion with a fresh `red-teamer` sub-agent that did not produce the numbers. Score confidence, completeness, methodology, and reproducibility. | Required for every non-trivial analysis (not approved as too small to gate) |
 | 9 | Deliver | Shared | Package the answer, charts, caveats, and next steps for the audience. | `validationcheck` |
 | 10 | Monitor | Data Product | Check refreshes and metric drift, meaning numbers move unexpectedly. | - |
 | 11 | Document | Shared | Record assumptions, queries, decisions, and validation notes. | - |
@@ -39,10 +51,13 @@ The receipt records the question, metric definitions, and what a valid answer
 looks like. A trivial receipt is allowed only with a one-line reason.
 
 `validationcheck` runs before Stage 9. It fails closed when there is no
-validation receipt, when reconciliation failed, or when a required Stage 8 score
-is missing or below threshold. High-stakes work means work that drives money,
-headcount, or strategy. The gate decides that from the spec receipt's
-decision-impact field, not from an operator bypass.
+validation receipt, when reconciliation failed, when the adversarial-review
+receipt is missing, or when a required Stage 8 score is missing or below
+threshold, meaning the minimum allowed score. Adversarial review means a review
+that attacks the answer.
+High-stakes work means work that drives money, headcount, or strategy. The gate
+decides that from the spec receipt's decision-impact field, not from an operator
+bypass.
 
 ## Score Rubric
 
@@ -54,12 +69,14 @@ Stage 8 scores each result from 1 to 5:
 - **Reproducibility** - whether someone else could rerun it and get the same
   number.
 
-Default threshold: every dimension must be at least 3. A lower score blocks
-delivery unless the operator records an acceptance reason.
+Default threshold, meaning the minimum allowed score: every dimension must be at
+least 3. A lower score blocks delivery unless the operator records an acceptance
+reason.
 
 ## Operator Rule
 
 The operator owns judgment: scope, trade-offs, risk acceptance, and delivery
-approval. Claude owns legwork: drafting, querying, checking, summarizing, and
-finding weak spots. When a choice changes the number stakeholders act on, Claude
-must surface it before computing results.
+approval. Claude owns legwork: drafting, checking, summarizing, and finding weak
+spots, while worker sub-agents run repeatable profiling, counting, and queries.
+When a choice changes the number stakeholders act on, Claude must surface it
+before computing results.

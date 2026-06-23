@@ -9,6 +9,28 @@ The assay loop helps BI operators ship trustworthy analysis. It routes work
 through the staged lifecycle: intake, frame, spec, discovery, execute, validate,
 review, deliver, document, and learn.
 
+## Governing rules (always apply, even for small or "just look at this" requests)
+
+These mirror the Governing rules in the project `CLAUDE.md` and are not optional.
+Skipping any is a named exception that needs the operator's explicit OK first.
+A request to "see what you can do," find trends, compare numbers, profile data,
+or summarize data is analysis (answering with data or numbers) unless the
+operator explicitly approves a named exception.
+
+1. **Route through the loop by default.** Any analysis runs frame → spec →
+   discovery (recording no forks, meaning choices that change the number, if
+   none exist) → execute → validate → deliver. Answering inline without the loop
+   is the exception — name it and get approval.
+2. **Independent validation is mandatory.** Do NOT present findings until a
+   **fresh `red-teamer` sub-agent that did not produce the numbers** has
+   reviewed them and a validation receipt (saved proof that checks happened)
+   exists. A sub-agent is a worker agent given a narrow task. Self-review never
+   counts.
+3. **Delegate mechanical work.** Profiling, counting, and queries go to the
+   `eda-profiler` and `query-runner` sub-agents (worker agents given narrow
+   tasks; cheaper model). The main model (the agent leading judgment) plans,
+   interprets, synthesizes — it does not run crunching scripts inline.
+
 Project-specific rules live in `assay.config.jsonc`. Receipts live in
 `.assay/receipts/`. A receipt is a saved proof file for a completed stage.
 Always write receipts with `.claude/workflows/receipt.sh`; do not hand-write
@@ -41,6 +63,9 @@ Interview the operator and fill in:
 - High-stakes examples, meaning work that drives money, headcount, or strategy.
 
 Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
+When drafting `CLAUDE.md`, copy the **Governing rules** section from
+`CLAUDE.starter.md` verbatim, so every future session in this folder routes
+through the loop, validates independently, and delegates mechanical work.
 
 ### `/assay frame`
 
@@ -112,13 +137,25 @@ If it fails, stop. Explain that Stage 6 is blocked until the Stage 2 spec receip
 exists. Do not bypass the gate.
 
 Then run the analysis or build the data product according to the spec and ruled
-methodology. Invoke `.claude/workflows/assay-execute.js` with the analysis
-request, Stage 2 spec receipt, and operator rulings.
+methodology. **Delegate the mechanical work to sub-agents** (they run on a
+cheaper model): dispatch the `eda-profiler` to profile the data and the
+`query-runner` to run the ruled queries and calculations. The main model
+interprets and synthesizes their output — it does not run the crunching scripts
+inline. Invoke `.claude/workflows/assay-execute.js` with the analysis request,
+Stage 2 spec receipt, and operator rulings.
 
 ### `/assay validate`
 
 Reconcile results to source-of-truth. Reconciliation means numbers match the
-official source, or differences are explained.
+official source, or differences are explained. **Dispatch the `reconciler`
+sub-agent** to tie results to source-of-truth and gather the validation evidence
+— do not reconcile inline against your own numbers.
+
+**The adversarial review MUST be done by a fresh `red-teamer` sub-agent that did
+not produce the results.** Dispatch the `red-teamer` to re-derive the key numbers
+from the raw data without seeing the analysis code, and to attack the soft spots
+(assumptions, edge cases, framing). Self-review by the agent that ran the
+analysis does NOT satisfy this stage — it cannot catch its own blind spots.
 
 Invoke `.claude/workflows/assay-validate.js` with the analysis request, Stage 2
 spec receipt, results, and config.
@@ -130,9 +167,9 @@ workflow's `validationReceipt` to:
 bash .claude/workflows/receipt.sh validation <analysis-id> validation-receipt.json
 ```
 
-For high-stakes work or data products, also write the Stage 8 adversarial-review
-receipt, meaning a review that attacks the answer, by passing the workflow's
-`adversarialReviewReceipt` to:
+For every non-trivial analysis, meaning not approved as too small to gate, also
+write the Stage 8 adversarial-review receipt, meaning saved proof of independent
+attack, by passing the workflow's `adversarialReviewReceipt` to:
 
 ```bash
 bash .claude/workflows/receipt.sh adversarial-review <analysis-id> adversarial-review-receipt.json
@@ -141,7 +178,10 @@ bash .claude/workflows/receipt.sh adversarial-review <analysis-id> adversarial-r
 The receipt must include scores for confidence (how sure the answer is right),
 data completeness (how much relevant data was present), methodology soundness
 (whether the approach survives expert review), and reproducibility (can someone
-re-run the same work).
+re-run the same work). High-stakes work, meaning work that drives money,
+headcount, or strategy, and data products, meaning recurring reports or
+dashboards, must meet the configured score threshold (the minimum allowed score)
+before delivery.
 
 ### `/assay deliver`
 

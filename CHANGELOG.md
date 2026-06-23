@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Governing rules now ENFORCED, not just described: the project CLAUDE.md and /assay router require routing through the loop by default, independent validation by a fresh red-teamer (self-review never counts), and delegation of mechanical work to sub-agents. validationcheck now requires the independent review for every non-trivial analysis (trivial work escapes).
 - validationcheck: high-stakes and data-product work now blocks delivery when `sourceOfTruth` is unconfigured (makes `/assay intake` required in practice); routine work passes but warns. Source-of-truth is the anchor the back gate reconciles against.
 - bi-toolkit kit: two-track BI lifecycle (analysis + data-product), the assay loop engine (discovery/execute/validate), 31 adapted data-analyst skills, two fail-closed gates (questioncheck, validationcheck) with a receipt writer, public one-liner installer, and CI.
 - Phase 1 assay spine: operator docs, config template, public bootstrap,
