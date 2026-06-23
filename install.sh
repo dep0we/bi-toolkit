@@ -74,8 +74,22 @@ copy_if_missing() {
   fi
 }
 
-copy_file "$KIT/.claude/skills/assay/SKILL.md" "$TARGET/.claude/skills/assay/SKILL.md"
-say "  installed: .claude/skills/assay/SKILL.md"
+# Copy every skill the kit ships — the /assay router AND the 31 domain skills —
+# not just the router. (arc is the dev-kit's machine-local loop, never shipped.)
+skill_count=0
+for d in "$KIT"/.claude/skills/*/; do
+  [ -d "$d" ] || continue
+  name="$(basename "$d")"
+  [ "$name" = "arc" ] && continue
+  if $DRY_RUN; then
+    say "  [dry-run] copy .claude/skills/$name/"
+  else
+    mkdir -p "$TARGET/.claude/skills/$name"
+    cp -R "$d." "$TARGET/.claude/skills/$name/"
+  fi
+  skill_count=$((skill_count + 1))
+done
+say "  installed: .claude/skills/ ($skill_count skills, incl. the /assay router)"
 
 for f in receipt.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
