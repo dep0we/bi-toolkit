@@ -85,6 +85,9 @@ JSON
   }
 }
 JSON
+cat > "$T/assay.config.jsonc" <<'JSON'
+{ "sourceOfTruth": { "retention": "Finance system of record" } }
+JSON
 run_validation_gate "$T" "retention-q2"
 if [ "$RC" -eq 0 ]; then
   pass "writer validation and review receipts pass validationcheck"

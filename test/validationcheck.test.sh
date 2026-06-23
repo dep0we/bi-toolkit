@@ -65,6 +65,16 @@ write_review() {
 JSON
 }
 
+write_config() {
+  local dir="$1"
+  cat > "$dir/assay.config.jsonc" <<'JSON'
+{
+  "sourceOfTruth": { "retention": "Finance system of record" },
+  "scoreThresholds": { "defaultMinDimension": 3 }
+}
+JSON
+}
+
 echo "validationcheck tests"
 echo "====================="
 
@@ -83,6 +93,7 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
 write_spec "$T" "analysis" "strategy decision"
 write_validation "$T" true
 write_review "$T" 2
+write_config "$T"
 run_gate "$T" "retention-q2"
 if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:sub-threshold-score'; then
   pass "blocks sub-threshold Stage 8 score"
@@ -95,11 +106,38 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
 write_spec "$T" "data-product" "weekly operations review"
 write_validation "$T" true
 write_review "$T" 3
+write_config "$T"
 run_gate "$T" "retention-q2"
 if [ "$RC" -eq 0 ]; then
-  pass "passes reconciled data product with passing score"
+  pass "passes reconciled data product with passing score (source-of-truth configured)"
 else
   fail "expected passing validation (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+# High-stakes/data-product work blocks when sourceOfTruth is unconfigured,
+# even with otherwise-passing scores (intake required in practice).
+T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
+write_spec "$T" "data-product" "strategy decision"
+write_validation "$T" true
+write_review "$T" 4
+run_gate "$T" "retention-q2"
+if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:source-of-truth-unconfigured'; then
+  pass "blocks high-stakes delivery when sourceOfTruth is unconfigured"
+else
+  fail "expected source-of-truth-unconfigured block (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+# Routine one-off work is NOT blocked by an empty sourceOfTruth, but warns loudly.
+T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
+write_spec "$T" "analysis" "curiosity exploration"
+write_validation "$T" true
+run_gate "$T" "retention-q2"
+if [ "$RC" -eq 0 ] && printf '%s\n' "$ERR" | grep -qi 'sourceOfTruth is not configured'; then
+  pass "passes routine work but warns on unconfigured sourceOfTruth"
+else
+  fail "expected pass-with-warning (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
 rm -rf "$T"
 
