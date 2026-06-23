@@ -1,4 +1,9 @@
 .gstack/arc-rulings/
 .gstack/*.local.json
-.claude/workflows/
 .claude/skills/arc/
+.claude/workflows/arc-*.js
+.claude/workflows/arc-preflight.sh
+.claude/workflows/shadow-compare.js
+.assay/receipts/
+*.local
+*.local.json

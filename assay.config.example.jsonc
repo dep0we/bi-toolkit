@@ -1,0 +1,54 @@
+// ============================================================================
+// assay.config.jsonc - per-project rules for the assay loop.
+//
+// Copy this to `assay.config.jsonc`, then fill in the blanks during `/assay
+// intake`. JSONC means JSON with comments, so people can read the guidance.
+// ============================================================================
+{
+  "projectName": "this BI project",
+
+  "stack": {
+    "warehouse": "",
+    "biTool": "",
+    "queryLanguage": ""
+  },
+
+  "sourceOfTruth": {
+    // "gross_margin": "NetSuite finance report"
+  },
+
+  "baseBranch": "main",
+
+  "receiptsDir": ".assay/receipts",
+
+  "highStakesDefinition": "High-stakes means the answer drives money, headcount, or strategy.",
+
+  "scoreThresholds": {
+    "defaultMinDimension": 3,
+    "allowRecordedAcceptance": true
+  },
+
+  "crossFamily": {
+    "enabled": true,
+    "exec": "codex exec"
+  },
+
+  "tripwires": "\nA methodology choice must be escalated if it changes a number stakeholders act on.\n\nEscalate when the work changes any of these:\n  1. Metric definition, meaning the exact rule for calculating a number.\n  2. Segment boundary, meaning who is included or excluded.\n  3. Date window, meaning the time period counted.\n  4. Null handling, meaning what missing values do to the result.\n  5. Outlier handling, meaning how unusual values are treated.\n  6. Statistical method, meaning the math used to compare groups.\n  7. Source switch, meaning a different system becomes the input.\n  8. Source-of-truth, meaning the official place to compare against.\n  9. Refresh cadence, meaning how often a data product updates.\n\nIf unsure, escalate. A silent choice that changes the number is a defect.",
+
+  "prepDimensions": [
+    { "key": "decision-value", "prompt": "Will this answer change a real decision, or is it curiosity work?" },
+    { "key": "data-availability", "prompt": "Do we have the data needed to answer the question?" },
+    { "key": "metric-definition", "prompt": "Are every metric and source-of-truth clearly defined?" },
+    { "key": "methodology-risk", "prompt": "Which approach choices could change the answer?" },
+    { "key": "plain-language", "prompt": "Find terms that need inline definitions in 4-8 words." }
+  ],
+
+  "reviewLenses": [
+    { "key": "decision-value", "prompt": "Find places where the answer does not support the stated decision." },
+    { "key": "methodology", "prompt": "Find weak analysis choices, missing comparisons, or unsupported assumptions." },
+    { "key": "reconciliation", "prompt": "Find numbers that do not tie to source-of-truth or lack an explanation." },
+    { "key": "data-completeness", "prompt": "Find missing, stale, duplicated, or filtered-out data that could change the result." },
+    { "key": "plain-language", "prompt": "Find jargon and require inline definitions in 4-8 words." },
+    { "key": "shortcut-hunt", "shortcut": true, "prompt": "Assume a corner was cut. Find the easy path, the consequence, and whether it blocks delivery." }
+  ]
+}
