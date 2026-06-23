@@ -6,7 +6,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Phase 1 assay spine: operator docs, config template, public bootstrap,
+  rerunnable installer, `/assay` router, gate scripts, test harness, and starter
+  BI memory lessons.
 
 ### Changed
+- Updated architecture docs and gitignore rules so this kit source tracks its
+  own `.claude` engine files while installed projects ignore runtime receipts.
 
 ### Fixed
