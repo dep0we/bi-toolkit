@@ -1,0 +1,30 @@
+name: CI
+
+# Runs the gate test suite on every PR and on pushes to main, so a change
+# can't merge unless the fail-closed gates still behave. Free + unlimited
+# minutes for public repos.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for workflow-script syntax checks)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax-check the assay workflow scripts
+        run: |
+          for f in .claude/workflows/assay-*.js; do
+            node --check "$f"
+          done
+
+      - name: Run the gate test suite
+        run: bash test/run.sh
