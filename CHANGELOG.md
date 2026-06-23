@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- bi-toolkit kit: two-track BI lifecycle (analysis + data-product), the assay loop engine (discovery/execute/validate), 31 adapted data-analyst skills, two fail-closed gates (questioncheck, validationcheck) with a receipt writer, public one-liner installer, and CI.
 - Phase 1 assay spine: operator docs, config template, public bootstrap,
   rerunnable installer, `/assay` router, gate scripts, test harness, and starter
   BI memory lessons.
