@@ -1,0 +1,128 @@
+// ============================================================================
+// arc.config.jsonc — per-project rules for the arc quality loop.
+//
+// Copy this to your repo as `.gstack/arc.config.jsonc` (or arc.config.json),
+// then fill in the blanks. The /arc skill loads this file, strips comments,
+// and injects it into every arc workflow as `args.config`. Every field is
+// OPTIONAL — omit one and the workflow falls back to a sound generic default.
+//
+// The two fields that earn their keep most: `tripwires` (what counts as a
+// decision only YOU may make) and `reviewLenses` (what each adversarial round
+// hunts for). Everything else is plumbing.
+// ============================================================================
+{
+  // Used in prompts so advisors reason about the right thing. e.g. "the billing service".
+  "projectName": "this project",
+
+  // Domain of this project. Controls which per-domain taxonomy subtypes are
+  // used in the decision ledger and which per-domain layer of the judgment
+  // profile is active for shadow-compare predictions.
+  //   "code"    — a software project (default; Tier-A subtypes: tech-choice,
+  //               schema, dependency, sequencing)
+  //   "content" — a content/publishing project (Tier-A subtypes: tone,
+  //               structure, channel, audience)
+  // Set at project setup. If absent, shadow-compare defaults to "code".
+  // See the decision-delegation setup checklist in github-setup.md.
+  "domain": "code",
+
+  // What the agents read to learn your design rules. Name the real files.
+  // AGENTS.md ships here by default (the public-safe cross-tool file Codex reads;
+  // CLAUDE.md is canonical). The "(if present)" means a Claude-only repo with no
+  // AGENTS.md just skips it; drop it from the list if you prefer.
+  "designDocs": "CLAUDE.md, AGENTS.md (if present), docs/ARCHITECTURE.md, and docs/DECISIONS.md",
+
+  // Branch builds diff against. Usually "main".
+  "baseBranch": "main",
+
+  // The exact command that runs your full test suite, e.g. "npm test", "pytest",
+  // "make test", "bash test/run.sh". The enforced TEST GATE (#15) runs this after a
+  // build reaches pr-ready and BLOCKS the hand-off to /ship unless it exits 0. The
+  // gate is fail-closed: leaving this unset stops the build with `tests-unconfigured`
+  // rather than silently skipping tests, so set it to your project's real command.
+  // It ships commented (no safe cross-language default), so a fresh project sets it
+  // on the first build. Uncomment + set yours:
+  // "testCommand": "npm test",
+
+  // OPTIONAL coverage floor. If set, the test gate also runs this after the suite
+  // passes and BLOCKS on a non-zero exit (`coverage-floor`). arc never parses the
+  // output: your command's EXIT CODE is the gate, so point it at a tool that exits
+  // non-zero when coverage is below your threshold (the project self-enforces). E.g.:
+  // "coverageCommand": "pytest --cov --cov-fail-under=80",
+
+  // Governing docs the build may NEVER amend unattended (your principles / ADRs).
+  // Any change to a principle/decision in these halts the run for you to rule.
+  //
+  // AGENTS.md ships guarded by default. It's the public-safe cross-tool file Codex
+  // reads (CLAUDE.md is canonical); both are governing docs, so both are guarded
+  // and an unattended rewrite of either halts for you. Listing a file you don't
+  // have yet is harmless: a nonexistent file never trips the gate, so a Claude-only
+  // repo can leave or drop "AGENTS.md".
+  //
+  // Added a NEW load-bearing doc (e.g. a docs/spec/ contract)? Add its path here —
+  // the loop only guards the files listed.
+  "governingDocs": {
+    "paths": ["AGENTS.md", "CLAUDE.md", "docs/DECISIONS.md", "docs/ARCHITECTURE.md"],
+    "tripDescription": "a design principle, architectural decision, or other governing constraint was added or changed — routine status / version / changelog-accounting edits do NOT count"
+  },
+
+  // Cross-family reviewer — a different-vendor model joins every review round
+  // (discovery panel AND build/finish code review). Load-bearing for security /
+  // filesystem-path / cost work: a different model family catches bugs same-family
+  // rounds miss. The /arc skill probes the CLI before each run; if it's unreachable
+  // the loop falls back to a fresh same-family read and flags crossFamilyReviewed:false.
+  //   enabled — default true; set false to skip cross-family entirely
+  //   exec    — how to invoke your cross-family CLI one-shot (default "codex exec")
+  "crossFamily": {
+    "enabled": true,
+    "exec": "codex exec"
+  },
+
+  // ---- SHADOW-COMPARE COST LEVERS (decision-delegation, issue #32) ---------
+  // The shadow-compare step predicts + challenges each Tier-A fork (measurement
+  // only; the operator still rules every fork). Each predicted fork fans out to a
+  // few LLM calls, so these two knobs bound the cost on a discovery that raises
+  // many Tier-A forks. Both are OPTIONAL with sane defaults.
+  //   shadowMaxForks       (hard cap on how many Tier-A forks get a PREDICTION
+  //                          per run (default 10). Forks beyond the cap are still
+  //                          presented to you for ruling; they just skip the
+  //                          (optional) prediction/measurement this run.
+  //   shadowMaxConcurrency (how many forks predict/challenge in parallel
+  //                          (default 8). Lower it if you hit API rate limits.
+  // "shadowMaxForks": 10,
+  // "shadowMaxConcurrency": 8,
+
+  // ---- THE TIER-A TRIPWIRE CHECKLIST (the heart of the loop) --------------
+  // What makes a decision "ask-the-maintainer" rather than "agent decides".
+  // Re-author this list in YOUR project's terms. Keep the TIER B / TIER C /
+  // TIE-BREAK paragraphs — they're universal. The default (if you omit this)
+  // covers the surfaces almost every codebase shares.
+  "tripwires": "\nA decision is TIER A (must escalate to the maintainer — the agent may NOT decide it) if it hits ANY of:\n  1. Changes a public or user-facing surface: an API endpoint, CLI flag, config schema, public function signature, or wire format.\n  2. Changes a security, auth, secrets, or permissions boundary.\n  3. Adds/removes/upgrades a dependency or a new external service.\n  4. Changes data persistence: a DB schema, a migration, a stored format.\n  5. Introduces a NEW architectural concept or pattern not already in the codebase.\n  6. Touches money, billing, rate limits, or quotas.\n  7. Is a breaking change, or changes behavior users already depend on.\n  8. Would warrant a new architecture/decisions entry, or is irreversible without significant effort.\n\nTIER B (agent may decide, but ONLY by emitting a justification record and passing the shortcut-hunter): a genuine fork between implementations that all stay INSIDE an existing public contract — private helper structure, error-handling strategy, test layout, internal naming, refactors that change no public surface.\n\nTIER C (agent just does it, no record): one obvious idiomatic answer, mechanical edits, following an established pattern, doc wording that matches reality.\n\nTIE-BREAK: if you are unsure whether a fork is A or B, classify it A. Ambiguity always resolves UP.",
+
+  // ---- PREP DIMENSIONS (pre-implementation risk fan-out) ------------------
+  // Parallel scans that hand the implementer a risk list before any code.
+  // Omit to use the generic default (correctness, security, data-integrity,
+  // contract-compat, docs-drift).
+  "prepDimensions": [
+    { "key": "correctness", "prompt": "Correctness, edge cases, and regressions the implementer must handle." },
+    { "key": "security", "prompt": "Security: auth/authz, secrets, input validation, traversal, injection, data leaks." },
+    { "key": "data-integrity", "prompt": "Atomic writes, idempotency, crash-recovery, migrations + rollback safety, races." },
+    { "key": "contract-compat", "prompt": "Does anything break an existing API, CLI, schema, stored format, or caller?" },
+    { "key": "docs-and-drift", "prompt": "Will any doc, docstring, or error message claim something the code does not do?" }
+  ],
+
+  // ---- REVIEW LENSES (each adversarial round runs all of these) -----------
+  // Mark exactly one lens `"shortcut": true` — it uses the corner-cut schema.
+  // Omit to use the generic default (correctness, security, contract-
+  // conformance, test-coverage, shortcut-hunt, docs-reality). The default
+  // promotes SECURITY and TEST-COVERAGE to first-class lenses on purpose:
+  // those are what a downstream /ship-style review army keeps catching after
+  // a thinner loop "converges", so catching them here closes that gap.
+  "reviewLenses": [
+    { "key": "correctness", "prompt": "Find correctness bugs, edge cases, and regressions." },
+    { "key": "security", "prompt": "Find security holes: auth/authz gaps, secret/data leaks, unvalidated input, traversal, injection." },
+    { "key": "contract-conformance", "prompt": "Find divergence from the governing spec/contract and any unmet acceptance criterion." },
+    { "key": "test-coverage", "prompt": "Find new code paths no test exercises end-to-end, and false-green tests that pass with the fix stripped." },
+    { "key": "shortcut-hunt", "shortcut": true, "prompt": "Assume a corner was cut. Find the easy path taken vs the right path, the principle it violates, and a severity (P0/P1 blocks, P2 reports)." },
+    { "key": "docs-reality", "prompt": "Find any doc/docstring/error-message claim that does not match what the code does." }
+  ]
+}

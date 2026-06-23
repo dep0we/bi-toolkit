@@ -1,0 +1,4 @@
+.gstack/arc-rulings/
+.gstack/*.local.json
+.claude/workflows/
+.claude/skills/arc/
