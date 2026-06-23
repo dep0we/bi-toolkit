@@ -1,15 +1,40 @@
 # bi-toolkit — Architecture
 
-How this fits together: a one-paragraph mental model of the project goes here —
-the major pieces and how they relate. (Fill this in as the shape becomes real;
-keep it honest — describe what exists, not what is planned.)
+bi-toolkit has three layers: the assay spine, the operator's project config, and
+later domain skills. Phase 1 ships only the spine: docs, installer, `/assay`
+router, deterministic gates, tests, and starter memory.
 
-## Components
+## Spine
 
-<!-- One subsection per major component as they take shape: what it is, what it
-owns, and how it talks to the others. Empty for now — this is an honest stub. -->
+The spine is the shared lifecycle and enforcement layer:
 
-<!-- Growing docs/? When this folder holds more than the two stubs, add a
-docs/README.md table of contents, a docs/spec/ folder when you have a real
-contract, a docs/glossary.md when the vocabulary grows. Add each by hand, when you
-feel the absence, never preemptively. -->
+- `PLAYBOOK.md`, `methodology.md`, and `model-dial.md` explain the process.
+- `.claude/skills/assay/SKILL.md` routes `/assay` subcommands.
+- `.claude/workflows/questioncheck.sh` blocks Stage 6 without a spec receipt.
+- `.claude/workflows/validationcheck.sh` blocks Stage 9 without reconciliation
+  and required review scores.
+- `.claude/workflows/decision-ledger.sh` is copied from the dev-process kit as a
+  reusable ledger query tool.
+
+## Operator Config
+
+`assay.config.example.jsonc` becomes `assay.config.jsonc` in an installed
+project. It captures stack, source-of-truth, tripwires, review lenses, thresholds,
+and high-stakes rules. Source-of-truth means the official place to compare
+against.
+
+Runtime receipts live under `.assay/receipts/` and are gitignored. A receipt is a
+saved proof file for a completed stage.
+
+## Install Contract
+
+`bootstrap.sh` is the public `curl | bash` entry point. It downloads the public
+repo with `curl` and `tar`, then runs `install.sh` into the current folder.
+`install.sh` is rerunnable: it overwrites kit tooling but does not overwrite
+operator config or docs.
+
+## Later Phases
+
+The 31 domain skills, `assay-discovery.js`, `assay-execute.js`,
+`assay-validate.js`, and Sonnet agent definitions are not present in Phase 1.
+Docs and router copy must not claim those engines exist yet.
