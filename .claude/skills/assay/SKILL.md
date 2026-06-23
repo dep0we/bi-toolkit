@@ -11,6 +11,8 @@ review, deliver, document, and learn.
 
 Project-specific rules live in `assay.config.jsonc`. Receipts live in
 `.assay/receipts/`. A receipt is a saved proof file for a completed stage.
+Always write receipts with `.claude/workflows/receipt.sh`; do not hand-write
+the files directly.
 
 ## Plain-Language Rule
 
@@ -52,7 +54,21 @@ stopping or reframing.
 
 ### `/assay spec`
 
-Write the Stage 2 spec receipt under `.assay/receipts/`.
+Write the Stage 2 spec receipt under `.assay/receipts/` by calling:
+
+```bash
+bash .claude/workflows/receipt.sh spec <analysis-id> <<'JSON'
+{
+  "question": "...",
+  "metricDefinitions": {
+    "metric_name": "exact calculation rule"
+  },
+  "validAnswer": "...",
+  "decisionImpact": "...",
+  "track": "analysis"
+}
+JSON
+```
 
 Required fields:
 
@@ -64,11 +80,23 @@ Required fields:
 - `track`: `analysis` or `data-product`.
 
 For a trivial receipt, include `reason` instead of the full spec fields.
+Call:
+
+```bash
+bash .claude/workflows/receipt.sh trivial <analysis-id> <<'JSON'
+{
+  "reason": "..."
+}
+JSON
+```
 
 ### `/assay discovery`
 
 Find methodology forks before results are computed. Methodology means the chosen
 analysis approach. Escalate any fork that changes a number stakeholders act on.
+
+Invoke `.claude/workflows/assay-discovery.js` with the analysis request, the
+Stage 2 spec receipt, and the config.
 
 Do not compute final results in this stage.
 
@@ -84,18 +112,36 @@ If it fails, stop. Explain that Stage 6 is blocked until the Stage 2 spec receip
 exists. Do not bypass the gate.
 
 Then run the analysis or build the data product according to the spec and ruled
-methodology.
+methodology. Invoke `.claude/workflows/assay-execute.js` with the analysis
+request, Stage 2 spec receipt, and operator rulings.
 
 ### `/assay validate`
 
 Reconcile results to source-of-truth. Reconciliation means numbers match the
 official source, or differences are explained.
 
-Write the Stage 7 validation receipt under `.assay/receipts/`.
+Invoke `.claude/workflows/assay-validate.js` with the analysis request, Stage 2
+spec receipt, results, and config.
+
+Write the Stage 7 validation receipt under `.assay/receipts/` by passing the
+workflow's `validationReceipt` to:
+
+```bash
+bash .claude/workflows/receipt.sh validation <analysis-id> validation-receipt.json
+```
 
 For high-stakes work or data products, also write the Stage 8 adversarial-review
-receipt with scores for confidence, data completeness, methodology soundness,
-and reproducibility.
+receipt, meaning a review that attacks the answer, by passing the workflow's
+`adversarialReviewReceipt` to:
+
+```bash
+bash .claude/workflows/receipt.sh adversarial-review <analysis-id> adversarial-review-receipt.json
+```
+
+The receipt must include scores for confidence (how sure the answer is right),
+data completeness (how much relevant data was present), methodology soundness
+(whether the approach survives expert review), and reproducibility (can someone
+re-run the same work).
 
 ### `/assay deliver`
 
@@ -135,7 +181,9 @@ Receipt files:
 - `.assay/receipts/<analysis-id>-validation-receipt.json`
 - `.assay/receipts/<analysis-id>-adversarial-review-receipt.json`
 
-## Phase 1 Scope
+## Installed Components
 
-This installed skill currently routes the spine and gates. Domain skills and
-`assay-*.js` workflow engines are later phases, so do not claim they exist yet.
+This installed skill routes the spine and gates. The installed workflow engines
+are `.claude/workflows/assay-discovery.js`,
+`.claude/workflows/assay-execute.js`, and
+`.claude/workflows/assay-validate.js`.

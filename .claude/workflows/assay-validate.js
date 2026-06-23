@@ -1,6 +1,6 @@
 export const meta = {
   name: 'assay-validate',
-  description: 'Phase 7/8 of the assay loop. Reconciles results to source-of-truth and scores confidence, data-completeness, methodology-soundness, and reproducibility. Blocks when any dimension is below threshold.',
+  description: 'Phase 7/8 of the assay loop. Reconciles results to source-of-truth and scores confidence (how sure the answer is right), data completeness (how much relevant data was present), methodology soundness (whether the approach survives expert review), and reproducibility (can someone re-run the same work). Blocks below threshold (minimum allowed score).',
   phases: [
     { title: 'Reconcile' },
     { title: 'Score' },
@@ -18,6 +18,7 @@ export const meta = {
 let A = args ?? {}
 if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const REQUEST = A.request ?? A.analysis ?? 'the current analysis request'
+const ANALYSIS_ID = A.analysisId ?? A.analysis_id ?? A.id ?? 'current-analysis'
 const SPEC = A.spec ?? 'the current assay spec receipt'
 const RESULTS = A.results ?? A.artifacts ?? 'the current result artifacts'
 const CFG = A.config ?? {}
@@ -147,10 +148,19 @@ if (!reconciliation?.reconciled || reconciliation.unreconciledResults?.length) {
   log(`BLOCK: ${reconciliation?.unreconciledResults?.length ?? 0} result(s) unreconciled`)
   return {
     request: REQUEST,
+    analysisId: ANALYSIS_ID,
     status: 'blocked',
     gate: 'validationcheck',
     highStakes: HIGH_STAKES,
     reconciliation,
+    validationReceipt: {
+      kind: 'validation',
+      reconciled: false,
+      reconciliation: reconciliation?.receipt ?? reconciliation?.checks ?? 'Reconciliation did not complete.',
+      checks: reconciliation?.checks ?? [],
+      variances: reconciliation?.variances ?? [],
+      unreconciledResults: reconciliation?.unreconciledResults ?? ['reconciliation did not complete'],
+    },
     scores: null,
     blockers: reconciliation?.unreconciledResults ?? ['reconciliation did not complete'],
     note: 'Validation blocked because at least one result does not tie to source-of-truth. Nothing delivered.',
@@ -199,42 +209,58 @@ const belowThreshold = [
 
 const blockingFindings = (redTeam?.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1')
 
+const validationReceipt = {
+  kind: 'validation',
+  reconciled: true,
+  reconciliation: reconciliation.receipt ?? reconciliation.checks,
+  checks: reconciliation.checks ?? [],
+  variances: reconciliation.variances ?? [],
+}
+
+const adversarialReviewReceipt = {
+  kind: 'adversarial-review',
+  scores: {
+    confidence: scores.confidence?.score,
+    dataCompleteness: scores.dataCompleteness?.score,
+    methodologySoundness: scores.methodologySoundness?.score,
+    reproducibility: scores.reproducibility?.score,
+  },
+  rationale: score?.overallRationale ?? '',
+  blockingConcerns: score?.blockingConcerns ?? [],
+  redTeamFindings: redTeam?.findings ?? [],
+}
+
 if (belowThreshold.length || blockingFindings.length) {
   log(`BLOCK: ${belowThreshold.length} score dimension(s) below threshold and ${blockingFindings.length} blocking red-team finding(s)`)
   return {
     request: REQUEST,
+    analysisId: ANALYSIS_ID,
     status: 'blocked',
     gate: 'validationcheck',
     highStakes: HIGH_STAKES,
     reconciliation,
+    validationReceipt,
     scores: score,
+    adversarialReviewReceipt,
     redTeam,
     belowThreshold: belowThreshold.map(([dimension, actual, threshold]) => ({ dimension, actual: actual ?? null, threshold })),
     blockingFindings,
-    note: 'Validation blocked because the result is below the assay score threshold or failed adversarial review. Nothing delivered.',
+    note: 'Validation blocked because the result is below the assay score threshold (minimum allowed score) or failed adversarial review (review that attacks the answer). Nothing delivered.',
   }
 }
 
 return {
   request: REQUEST,
+  analysisId: ANALYSIS_ID,
   status: 'passed',
   gate: 'validationcheck',
   highStakes: HIGH_STAKES,
   reconciliation,
+  validationReceipt,
   scores: score,
+  adversarialReviewReceipt,
   redTeam,
   belowThreshold: [],
   blockingFindings: [],
-  receipt: {
-    kind: 'validation',
-    reconciled: true,
-    scoreThresholds: THRESHOLDS,
-    scores: {
-      confidence: scores.confidence?.score,
-      dataCompleteness: scores.dataCompleteness?.score,
-      methodologySoundness: scores.methodologySoundness?.score,
-      reproducibility: scores.reproducibility?.score,
-    },
-  },
   note: 'Validation passed. This is a validation receipt only; delivery still requires the delivery stage.',
 }

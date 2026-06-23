@@ -177,13 +177,13 @@ case "$STATUS" in
     gate "unreconciled" "The result has not reconciled to source-of-truth. Source-of-truth means the official place to compare against."
     ;;
   missing-review)
-    gate "missing-review" "This work is high-stakes or a data product, so Stage 8 review and scoring are required before delivery."
+    gate "missing-review" "This work is high-stakes, meaning it drives major business choices, or a data product, meaning a recurring report or dashboard. Stage 8 review and scoring are required before delivery."
     ;;
   invalid-review|missing-score)
-    gate "invalid-review" "The Stage 8 review receipt must include scores for confidence, data completeness, methodology soundness, and reproducibility."
+    gate "invalid-review" "The Stage 8 review receipt must include scores for confidence (how sure the answer is right), data completeness (how much relevant data was present), methodology soundness (whether the approach survives expert review), and reproducibility (can someone re-run the same work)."
     ;;
   sub-threshold-score)
-    gate "sub-threshold-score" "A Stage 8 score is below threshold. Raise the score or record an explicit acceptance reason before delivery."
+    gate "sub-threshold-score" "A Stage 8 score is below threshold, meaning the minimum allowed score. Raise the score or record an explicit acceptance reason before delivery."
     ;;
   missing-validation)
     gate "missing-validation" "Stage 9 is blocked because no Stage 7 validation receipt exists."

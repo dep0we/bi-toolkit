@@ -29,8 +29,12 @@ if $CHECK; then
   missing=()
   for f in \
     ".claude/skills/assay/SKILL.md" \
+    ".claude/workflows/receipt.sh" \
     ".claude/workflows/questioncheck.sh" \
     ".claude/workflows/validationcheck.sh" \
+    ".claude/workflows/assay-discovery.js" \
+    ".claude/workflows/assay-execute.js" \
+    ".claude/workflows/assay-validate.js" \
     ".claude/workflows/decision-ledger.sh" \
     "assay.config.jsonc"; do
     [ -e "$TARGET/$f" ] || missing+=("$f")
@@ -73,9 +77,14 @@ copy_if_missing() {
 copy_file "$KIT/.claude/skills/assay/SKILL.md" "$TARGET/.claude/skills/assay/SKILL.md"
 say "  installed: .claude/skills/assay/SKILL.md"
 
-for f in questioncheck.sh validationcheck.sh decision-ledger.sh; do
+for f in receipt.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
+  say "  installed: .claude/workflows/$f"
+done
+
+for f in assay-discovery.js assay-execute.js assay-validate.js; do
+  copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
 done
 

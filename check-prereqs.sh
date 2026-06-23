@@ -82,8 +82,12 @@ check_required_cli git "Install git so receipts and project files can be managed
 check_required_cli curl "Install curl; bootstrap uses it to download the public kit."
 check_required_json_runner
 check_required_skill_file ".claude/skills/assay/SKILL.md"
+check_required_skill_file ".claude/workflows/receipt.sh"
 check_required_skill_file ".claude/workflows/questioncheck.sh"
 check_required_skill_file ".claude/workflows/validationcheck.sh"
+check_required_skill_file ".claude/workflows/assay-discovery.js"
+check_required_skill_file ".claude/workflows/assay-execute.js"
+check_required_skill_file ".claude/workflows/assay-validate.js"
 check_optional_cli codex "Optional cross-family model, meaning a second model family for review."
 
 echo "Summary: required missing=${req_missing}, optional missing=${warn_missing}"

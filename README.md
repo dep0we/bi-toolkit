@@ -28,9 +28,9 @@ curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh
 ```
 
 The bootstrap script downloads this public kit with `curl`, runs `install.sh`
-into the current folder, copies the `/assay` skill and gate scripts, seeds BI
-lessons, and points you to `/assay intake`. It does not require GitHub CLI,
-authentication, or a GitHub account.
+into the current folder, copies the `/assay` skill, workflow engines, gate
+scripts, and receipt writer, seeds BI lessons, and points you to `/assay
+intake`. It does not require GitHub CLI, authentication, or a GitHub account.
 
 For a local checkout of this kit:
 
@@ -65,8 +65,8 @@ Two gates are enforced in Phase 1:
 Receipts are saved under `.assay/receipts/` in the operator project. A receipt is
 a saved proof file for a completed stage.
 
-## What Phase 1 Includes
+## What This Includes
 
 This branch ships the spine: docs, installer, config template, `/assay` router,
-gate scripts, tests, and starter memory. It does not yet ship the 31 domain
-skills or the `assay-*.js` workflow engines; those are later phases.
+workflow engines, receipt writer, gate scripts, tests, starter memory, agent
+definitions, and the adapted domain skills under `.claude/skills/`.
