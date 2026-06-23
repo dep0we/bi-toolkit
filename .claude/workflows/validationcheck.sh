@@ -81,8 +81,19 @@ high = spec.get("highStakes") is True or any(w in impact for w in ("money", "hea
 data_product = track in ("data-product", "data_product", "dataproduct")
 needs_review = high or data_product
 
+sot = config.get("sourceOfTruth") if isinstance(config, dict) else None
+sot_configured = isinstance(sot, dict) and len(sot) > 0
+
 if not needs_review:
-    print("ok")
+    # Routine one-off work: never blocked on config, but warn if the official
+    # comparison source was never set (intake skipped).
+    print("ok" if sot_configured else "ok-warn-sot")
+    raise SystemExit
+
+if not sot_configured:
+    # High-stakes or data-product work cannot claim a source-of-truth tie when
+    # no source-of-truth is configured. Make intake required in practice here.
+    print("source-of-truth-unconfigured")
     raise SystemExit
 
 review = load_json(review_path)
@@ -140,7 +151,10 @@ const impact = `${spec.decisionImpact || ""} ${spec.highStakesReason || ""}`.toL
 const track = String(spec.track || "").toLowerCase();
 const high = spec.highStakes === true || ["money", "headcount", "strategy"].some((w) => impact.includes(w));
 const dataProduct = ["data-product", "data_product", "dataproduct"].includes(track);
-if (!high && !dataProduct) { console.log("ok"); process.exit(0); }
+const sot = config.sourceOfTruth;
+const sotConfigured = sot && typeof sot === "object" && !Array.isArray(sot) && Object.keys(sot).length > 0;
+if (!high && !dataProduct) { console.log(sotConfigured ? "ok" : "ok-warn-sot"); process.exit(0); }
+if (!sotConfigured) { console.log("source-of-truth-unconfigured"); process.exit(0); }
 const review = load(reviewPath);
 if (!review) { console.log("missing-review"); process.exit(0); }
 if (review.kind !== "adversarial-review") { console.log("invalid-review"); process.exit(0); }
@@ -166,6 +180,14 @@ case "$STATUS" in
   ok)
     printf 'assay-gate-ok:validationcheck\n' >&2
     exit 0
+    ;;
+  ok-warn-sot)
+    printf 'validationcheck: WARNING - sourceOfTruth is not configured. Source-of-truth means the official place to compare each metric against (for example gross_margin -> NetSuite finance report). Reconciliation cannot be checked against a declared source, so this validation is weaker than it should be. Run /assay intake, or add your key metrics to sourceOfTruth in assay.config.jsonc.\n' >&2
+    printf 'assay-gate-ok:validationcheck\n' >&2
+    exit 0
+    ;;
+  source-of-truth-unconfigured)
+    gate "source-of-truth-unconfigured" "This work is high-stakes, meaning it drives major business choices, or a data product, meaning a recurring report or dashboard - but sourceOfTruth is not configured. Source-of-truth means the official place to compare each metric against (for example gross_margin -> NetSuite finance report). Run /assay intake, or add your key metrics to sourceOfTruth in assay.config.jsonc, before delivering."
     ;;
   invalid-json)
     gate "invalid-receipt" "A receipt file is not readable JSON. JSON is a structured data file."
