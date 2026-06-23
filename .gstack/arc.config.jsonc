@@ -12,7 +12,7 @@
 // ============================================================================
 {
   // Used in prompts so advisors reason about the right thing. e.g. "the billing service".
-  "projectName": "this project",
+  "projectName": "bi-toolkit (a Claude Code kit that standardizes a BI/data-analysis workflow for non-technical BI operators)",
 
   // Domain of this project. Controls which per-domain taxonomy subtypes are
   // used in the decision ledger and which per-domain layer of the judgment
@@ -40,8 +40,9 @@
   // gate is fail-closed: leaving this unset stops the build with `tests-unconfigured`
   // rather than silently skipping tests, so set it to your project's real command.
   // It ships commented (no safe cross-language default), so a fresh project sets it
-  // on the first build. Uncomment + set yours:
-  // "testCommand": "npm test",
+  // on the first build. This kit is shell + workflow JS + markdown skills, tested by
+  // a shell harness (like the dev-process-kit's test/run.sh that built it).
+  "testCommand": "bash test/run.sh",
 
   // OPTIONAL coverage floor. If set, the test gate also runs this after the suite
   // passes and BLOCKS on a non-zero exit (`coverage-floor`). arc never parses the
@@ -96,7 +97,7 @@
   // Re-author this list in YOUR project's terms. Keep the TIER B / TIER C /
   // TIE-BREAK paragraphs — they're universal. The default (if you omit this)
   // covers the surfaces almost every codebase shares.
-  "tripwires": "\nA decision is TIER A (must escalate to the maintainer — the agent may NOT decide it) if it hits ANY of:\n  1. Changes a public or user-facing surface: an API endpoint, CLI flag, config schema, public function signature, or wire format.\n  2. Changes a security, auth, secrets, or permissions boundary.\n  3. Adds/removes/upgrades a dependency or a new external service.\n  4. Changes data persistence: a DB schema, a migration, a stored format.\n  5. Introduces a NEW architectural concept or pattern not already in the codebase.\n  6. Touches money, billing, rate limits, or quotas.\n  7. Is a breaking change, or changes behavior users already depend on.\n  8. Would warrant a new architecture/decisions entry, or is irreversible without significant effort.\n\nTIER B (agent may decide, but ONLY by emitting a justification record and passing the shortcut-hunter): a genuine fork between implementations that all stay INSIDE an existing public contract — private helper structure, error-handling strategy, test layout, internal naming, refactors that change no public surface.\n\nTIER C (agent just does it, no record): one obvious idiomatic answer, mechanical edits, following an established pattern, doc wording that matches reality.\n\nTIE-BREAK: if you are unsure whether a fork is A or B, classify it A. Ambiguity always resolves UP.",
+  "tripwires": "\nA decision is TIER A (must escalate to the maintainer — the agent may NOT decide it) if it hits ANY of:\n  1. Changes the LIFECYCLE: adds/removes/reorders a stage, or changes which track (analysis vs data-product) a stage belongs to.\n  2. Changes a GATE's fail-closed behavior: what questioncheck or validationcheck blocks on, what counts as a passing receipt, or whether a gate can be skipped.\n  3. Changes the DECISION-TIER logic (what the kit escalates to the BI operator vs decides itself), or the methodology-decision discovery rules.\n  4. Changes the INSTALL / DISTRIBUTION mechanism: the public one-liner, what bootstrap pulls from GitHub, or what lands in a target project's .claude/.\n  5. Weakens the PLAIN-LANGUAGE governing rule (inline term definitions, consequence-framing) anywhere it is enforced — this kit's signature for non-technical operators.\n  6. Changes a public-facing surface the operator touches: a slash command, the intake interview's captured fields, or the scoring rubric's dimensions/thresholds.\n  7. Adds/removes/upgrades a dependency or external service the kit relies on.\n  8. Introduces a NEW architectural concept or pattern not already in the kit, or is irreversible without significant effort.\n\nTIER B (agent may decide, but ONLY by emitting a justification record and passing the shortcut-hunter): a genuine fork between implementations that all stay INSIDE an existing contract — a skill's internal wording, helper-script structure, test layout, how an existing stage is phrased, refactors that change no stage/gate/command surface.\n\nTIER C (agent just does it, no record): one obvious idiomatic answer, mechanical edits, following an established pattern, doc wording that matches reality.\n\nTIE-BREAK: if you are unsure whether a fork is A or B, classify it A. Ambiguity always resolves UP.",
 
   // ---- PREP DIMENSIONS (pre-implementation risk fan-out) ------------------
   // Parallel scans that hand the implementer a risk list before any code.
@@ -123,6 +124,7 @@
     { "key": "contract-conformance", "prompt": "Find divergence from the governing spec/contract and any unmet acceptance criterion." },
     { "key": "test-coverage", "prompt": "Find new code paths no test exercises end-to-end, and false-green tests that pass with the fix stripped." },
     { "key": "shortcut-hunt", "shortcut": true, "prompt": "Assume a corner was cut. Find the easy path taken vs the right path, the principle it violates, and a severity (P0/P1 blocks, P2 reports)." },
-    { "key": "docs-reality", "prompt": "Find any doc/docstring/error-message claim that does not match what the code does." }
+    { "key": "docs-reality", "prompt": "Find any doc/docstring/error-message claim that does not match what the code does." },
+    { "key": "plain-language", "prompt": "This kit's users are non-technical BI operators. Find any user-facing copy — skill prompts, decision-packet templates, intake questions, deliverable templates, error messages — that uses an undefined technical or statistical term (e.g. p-value, cohort, confidence interval, median, idempotent), frames a choice in jargon instead of consequences, or would force a non-technical operator to guess. Each finding: the term/phrase, where it appears, and a plain rewrite with the term defined inline in 4-8 words." }
   ]
 }
