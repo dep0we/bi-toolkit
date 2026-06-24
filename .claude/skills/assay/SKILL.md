@@ -399,6 +399,83 @@ Report the `assay-report-html`, optional `assay-report-pdf`, and
 deliverable receipt, meaning saved proof of the delivered report artifact, with
 `receipt.sh` kind `deliverable`; do not hand-write this receipt.
 
+For a data-product track, meaning a recurring report or dashboard, and when the
+approved spec asks for a universal dashboard, write a deterministic dashboard
+input JSON file after the deliver preflight passes. The dashboard contract is
+`schemaVersion: "assay-dashboard/v1"` plus:
+
+```json
+{
+  "schemaVersion": "assay-dashboard/v1",
+  "analysisId": "<analysis-id>",
+  "title": "Plain dashboard title",
+  "audience": "approved audience",
+  "refreshNote": "Refresh cadence and latest data timing.",
+  "panels": [
+    {
+      "type": "kpi",
+      "title": "Headline metric",
+      "data": {
+        "label": "Revenue",
+        "value": 125000,
+        "delta": "+8% versus last period",
+        "note": "Tied to the finance source."
+      }
+    },
+    {
+      "type": "bar",
+      "title": "Revenue by segment",
+      "data": {
+        "labels": ["Enterprise", "Mid-market"],
+        "values": [90000, 35000],
+        "source": "Finance source"
+      }
+    },
+    {
+      "type": "line",
+      "title": "Revenue trend",
+      "data": {
+        "points": [
+          { "x": "2026-04", "y": 112000 },
+          { "x": "2026-05", "y": 119000 }
+        ],
+        "source": "Finance source"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Follow-up rows",
+      "data": {
+        "columns": ["Owner", "Metric", "Status"],
+        "rows": [["Finance", "Revenue", "Reviewed"]]
+      }
+    }
+  ]
+}
+```
+
+Panel types are `kpi` for KPI (main number watched for decisions), `bar` for
+group comparison, `line` for time series (values tracked over time), and `table`
+for detail rows. Then render:
+
+```bash
+bash .claude/workflows/dashboard-render.sh <analysis-id> <dashboard-json>
+```
+
+The renderer writes a self-contained HTML dashboard, meaning a browser page
+saved as a file, under the configured deliverables directory, defaulting to
+`.assay/deliverables/<analysis-id>/`.
+Self-contained means no external network or CDN (hosted shared script source).
+Charts are inline SVG (browser-drawn chart image format), so they render
+offline without JavaScript (browser code that adds behavior) chart libraries.
+The renderer writes the deliverable receipt with `artifactType: "dashboard"`
+using `receipt.sh` kind `deliverable`; do not hand-write this receipt. Report
+the `assay-dashboard-html` and `assay-dashboard-receipt` paths from the renderer
+output.
+
+Tool-specific exports for Power BI / Tableau / Looker / Metabase are future
+work driven by intake. This engine produces the universal static-HTML view.
+
 After the answer is successfully delivered, clear the active analysis pointer:
 
 ```bash

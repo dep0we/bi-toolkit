@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Production Bundle 2 dashboard engine: `/assay deliver` can now render a
+  self-contained static HTML dashboard from the documented
+  `assay-dashboard/v1` JSON contract, using inline SVG charts for KPI, bar,
+  line, and table panels, applying report branding, and recording a
+  dashboard-typed deliverable receipt.
 - Production Bundle 1 report engine: `/assay deliver` now renders a repeatable,
   self-contained HTML report from a documented JSON contract, attempts a
   best-effort PDF when a local renderer is available, and records a deliverable

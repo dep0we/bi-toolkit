@@ -185,6 +185,7 @@ for f in \
   ".claude/workflows/datacheck.sh" \
   ".claude/workflows/receipt.sh" \
   ".claude/workflows/report-render.sh" \
+  ".claude/workflows/dashboard-render.sh" \
   ".claude/workflows/assay-discovery.js" \
   ".claude/workflows/assay-execute.js" \
   ".claude/workflows/assay-validate.js"; do
