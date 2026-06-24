@@ -7,18 +7,38 @@ MODE="${1:-status}"
 ID="${2:-}"
 
 case "$MODE" in
-  status|json|finish|list) ;;
+  status|json|finish|resume|list) ;;
   *)
     ID="$MODE"
     MODE="status"
     ;;
 esac
 
-if [ "$MODE" = "json" ] || [ "$MODE" = "finish" ]; then
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "assay-state: requires python3 to read receipts. A receipt is a saved proof file." >&2
+  exit 2
+fi
+
+if { [ "$MODE" = "finish" ] || [ "$MODE" = "resume" ]; } && [ -z "$ID" ]; then
+  ID="$(python3 - "${ASSAY_ACTIVE_FILE:-.assay/active.json}" <<'PY' 2>/dev/null || true
+import json
+import sys
+try:
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
+    print(data.get("analysisId", ""))
+except Exception:
+    print("")
+PY
+)"
   if [ -z "$ID" ]; then
-    echo "assay-state: usage: assay-state.sh $MODE <analysis-id>" >&2
+    echo "assay-state: no active analysis - run /assay status or /assay help" >&2
     exit 2
   fi
+fi
+
+if [ "$MODE" = "json" ] && [ -z "$ID" ]; then
+  echo "assay-state: usage: assay-state.sh $MODE <analysis-id>" >&2
+  exit 2
 fi
 
 case "$ID" in
@@ -27,11 +47,6 @@ case "$ID" in
     exit 2
     ;;
 esac
-
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "assay-state: requires python3 to read receipts. A receipt is a saved proof file." >&2
-  exit 2
-fi
 
 python3 - "$MODE" "$ID" "${ASSAY_RECEIPTS_DIR:-.assay/receipts}" "${ASSAY_RULINGS_DIR:-.assay/rulings}" "assay.config.jsonc" <<'PY'
 import datetime
@@ -126,6 +141,28 @@ def high_or_data_product(spec):
     high = spec.get("highStakes") is True or any(w in impact for w in ("money", "headcount", "strategy"))
     data_product = track in ("data-product", "data_product", "dataproduct")
     return high, data_product
+
+def stage_for_next(next_step):
+    step = str(next_step or "").lower()
+    if "intake" in step:
+        return {"number": 0, "name": "Intake"}
+    if "frame" in step:
+        return {"number": 1, "name": "Frame"}
+    if "spec" in step:
+        return {"number": 2, "name": "Spec"}
+    if "plan" in step:
+        return {"number": 3, "name": "Plan review"}
+    if "profile" in step:
+        return {"number": 4, "name": "Profile data"}
+    if "discovery" in step or "ruling" in step:
+        return {"number": 5, "name": "Discovery"}
+    if "execute" in step:
+        return {"number": 6, "name": "Execute"}
+    if "validate" in step or "review" in step:
+        return {"number": 7, "name": "Validate"}
+    if "data-safety" in step or "deliver" in step:
+        return {"number": 9, "name": "Deliver"}
+    return {"number": None, "name": "Unknown"}
 
 def current_fingerprint(path):
     if not os.path.exists(path):
@@ -372,9 +409,12 @@ def analyze(analysis_id):
         blockers = [f for f in findings if f.get("severity") == "blocker"]
         blocking_gate = blockers[0] if blockers else None
 
+    stage = stage_for_next(next_step)
+
     return {
         "analysisId": analysis_id,
         "track": (spec or {}).get("track"),
+        "stage": stage,
         "completedStages": completed,
         "openFindings": findings,
         "notes": notes,
@@ -417,6 +457,13 @@ def print_text(state, finish=False):
         print("  - none")
     for note in state["notes"]:
         print(f"note: {note}")
+    stage = state.get("stage") or {}
+    number = stage.get("number")
+    name = stage.get("name") or "Unknown"
+    if number is None:
+        print(f"stage: {name}")
+    else:
+        print(f"stage: Stage {number} {name}")
     gate = state.get("blockingGate")
     if gate:
         print(f"blocking gate: {gate.get('gate') or 'unknown'} ({gate['token']})")
@@ -443,5 +490,5 @@ if mode == "json":
     print(json.dumps(state, indent=2))
     raise SystemExit(0)
 
-print_text(state, finish=(mode == "finish"))
+print_text(state, finish=(mode in ("finish", "resume")))
 PY

@@ -26,6 +26,12 @@ curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh
 Then open Claude Code in that folder and run:
 
 ```text
+/assay help
+```
+
+When you are ready to set up the project, run:
+
+```text
 /assay intake
 ```
 
@@ -130,6 +136,7 @@ that choice before computing results.
 
 | Command | What it does |
 | --- | --- |
+| `/assay help` | Explains the kit in plain language and shows the next required step. |
 | `/assay intake` | Captures the BI stack, source-of-truth list, validation habits, stakeholders, and delivery rules. |
 | `/assay frame` | Chooses ANALYSIS or DATA PRODUCT and names the decision the work supports. |
 | `/assay spec` | Writes the spec receipt with the question, metrics, scope, and valid answer. |
@@ -138,6 +145,7 @@ that choice before computing results.
 | `/assay validate` | Reconciles results to source-of-truth and writes validation evidence. |
 | `/assay deliver` | Packages the final answer after `validationcheck` passes. |
 | `/assay status` | Shows existing receipts, blocking gates, and the next recommended step. |
+| `/assay resume` | Continues the active analysis from its saved next step. |
 
 ## 6. The skills
 
@@ -198,6 +206,13 @@ higher than the cost of review.
 ## 9. Everyday usage
 
 Example: answer "Why did Q2 renewal revenue drop?"
+
+```text
+/assay help
+```
+
+Use this anytime you are unsure what to do next. The installed hook also prints
+the active analysis and next required step at every turn.
 
 ```text
 /assay intake

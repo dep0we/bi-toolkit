@@ -39,6 +39,8 @@ if $CHECK; then
     ".claude/workflows/datacheck.sh" \
     ".claude/workflows/reprocheck.sh" \
     ".claude/workflows/assay-state.sh" \
+    ".claude/workflows/assay-active.sh" \
+    ".claude/workflows/assay-help.sh" \
     ".claude/workflows/assay-discovery.js" \
     ".claude/workflows/assay-execute.js" \
     ".claude/workflows/assay-validate.js" \
@@ -235,7 +237,7 @@ if [ -d "$KIT/.claude/hooks" ]; then
 fi
 merge_governing_hook
 
-for f in assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh decision-ledger.sh; do
+for f in assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh assay-active.sh assay-help.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
@@ -310,9 +312,10 @@ add_ignore() {
 
 add_ignore ".assay/receipts/"
 add_ignore ".assay/rulings/"
+add_ignore ".assay/active.json"
 add_ignore "*.local"
 add_ignore "*.local.json"
 
 say ""
-say "Done. Next step: run /assay intake."
+say "Done. Next step: run /assay help, then /assay intake."
 say "Receipts (saved proof files) will live under .assay/receipts/."

@@ -38,4 +38,5 @@ fi
 
 echo ""
 echo "bi-toolkit is installed."
-echo "Open Claude Code in this folder and run: /assay intake"
+echo "Open Claude Code in this folder and run: /assay help"
+echo "When you are ready to set up the project, run: /assay intake"

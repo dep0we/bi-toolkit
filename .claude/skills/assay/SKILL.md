@@ -1,6 +1,6 @@
 ---
 name: assay
-description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: intake, frame, spec, discovery, execute, validate, deliver, status, or finish.
+description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: help, intake, frame, spec, discovery, execute, validate, deliver, status, finish, or resume.
 ---
 
 # /assay - BI quality loop router
@@ -30,6 +30,10 @@ operator explicitly approves a named exception.
    `eda-profiler` and `query-runner` sub-agents (worker agents given narrow
    tasks; cheaper model). The main model (the agent leading judgment) plans,
    interprets, synthesizes — it does not run crunching scripts inline.
+4. **Orient new or confused operators.** If the operator seems new, seems
+   confused, or asks a data question without using `/assay`, briefly explain
+   that the kit will guide them step by step, then start the loop with
+   `/assay intake` or `/assay frame`. Do not lecture; take their hand.
 
 Project-specific rules live in `assay.config.jsonc`. Receipts live in
 `.assay/receipts/`. A receipt is a saved proof file for a completed stage.
@@ -56,6 +60,24 @@ Before every subcommand:
 3. Do not overwrite the operator's config.
 
 ## Subcommands
+
+### `/assay help`
+
+Show the plain-language guide and exact next step:
+
+```bash
+bash .claude/workflows/assay-help.sh
+```
+
+If the operator provides an analysis id, pass it through:
+
+```bash
+bash .claude/workflows/assay-help.sh <analysis-id>
+```
+
+Report the helper output directly. Help explains what the kit is, the lifecycle
+one stage at a time, and the next required step from `assay-state.sh`. If no
+active analysis or receipts exist, point the operator to `/assay intake`.
 
 ### `/assay intake`
 
@@ -86,6 +108,15 @@ Decide whether the request is:
 
 Capture the decision the answer supports. If no decision exists, recommend
 stopping or reframing.
+
+Set the active analysis pointer after the analysis id and track are known:
+
+```bash
+bash .claude/workflows/assay-active.sh set <analysis-id> <analysis|data-product>
+```
+
+The active pointer is `.assay/active.json`. It lets a fresh session know which
+analysis to resume first.
 
 ### `/assay spec`
 
@@ -123,6 +154,13 @@ bash .claude/workflows/receipt.sh trivial <analysis-id> <<'JSON'
   "reason": "..."
 }
 JSON
+```
+
+After writing either receipt, set the active analysis pointer. Use the receipt's
+track when present; otherwise use `analysis`:
+
+```bash
+bash .claude/workflows/assay-active.sh set <analysis-id> <analysis|data-product>
 ```
 
 ### `/assay discovery`
@@ -294,6 +332,15 @@ Then package the answer with:
 - reconciliation notes;
 - next steps.
 
+After the answer is successfully delivered, clear the active analysis pointer:
+
+```bash
+bash .claude/workflows/assay-active.sh clear <analysis-id>
+```
+
+Do not clear it when a preflight, validation, data-safety, reproducibility, or
+governing-doc check fails.
+
 ### `/assay status`
 
 For one analysis, call:
@@ -349,6 +396,18 @@ If `assay-state.sh finish` reports a blocking gate, explain it and drive the
 corrective next step only. A gate is a required stop-check before continuing.
 Never jump to a later stage because a previous output looks plausible.
 
+### `/assay resume [analysis-id]`
+
+Resume is an alias for finish. If an analysis id is supplied, treat it exactly
+like `/assay finish <analysis-id>`. If no id is supplied, use the active pointer:
+
+```bash
+bash .claude/workflows/assay-state.sh resume
+```
+
+Then continue only from the helper's next required step. If no active analysis
+exists, run `/assay status` or `/assay help`.
+
 ## Receipt Names
 
 Use a stable analysis id such as `revenue-retention-q2`.
@@ -365,6 +424,7 @@ This installed skill routes the spine and gates. The installed workflow engines
 are `.claude/workflows/assay-discovery.js`,
 `.claude/workflows/assay-execute.js`, and
 `.claude/workflows/assay-validate.js`.
-The installed `UserPromptSubmit` hook prints a governing-rule reminder each
-turn. It keeps the rules visible, but it is not a hard block; the hard block is
-the non-zero exit from `.claude/workflows/assay-preflight.sh`.
+The installed `UserPromptSubmit` hook prints a governing-rule reminder and the
+current active-analysis state each turn. It keeps the rules and next step
+visible, but it is not a hard block; the hard block is the non-zero exit from
+`.claude/workflows/assay-preflight.sh`.

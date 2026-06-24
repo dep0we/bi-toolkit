@@ -41,6 +41,11 @@ answer came fast" is exactly when the discipline slips.
    in 4-8 words, e.g. cohort (a group tracked over time). Frame choices by
    consequence, not jargon.
 
+5. **Proactively orient new or confused operators.** If the operator seems new,
+   seems confused, or asks a data question without using `/assay`, briefly
+   explain that the kit will guide them step by step, then start the loop with
+   `/assay intake` or `/assay frame`. Do not lecture; take their hand.
+
 ## What This Project Does
 
 Describe the recurring analysis, dashboard, or reporting work in plain language.

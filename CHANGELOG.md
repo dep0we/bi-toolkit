@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Bundle 5 conductor + onboarding: `.assay/active.json` now records the active
+  analysis and track, `/assay resume` can continue it without an id, the prompt
+  hook prints active state or a no-active hint every turn, and `/assay help`
+  gives plain-language onboarding plus the next required step.
 - Bundle 4 resume + reproducibility: `/assay status` now summarizes in-flight
   analyses from `.assay/` receipts and rulings, `/assay finish <analysis-id>`
   resumes from the single next required step without bypassing gates, and
