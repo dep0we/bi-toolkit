@@ -22,6 +22,12 @@
   "receiptsDir": ".assay/receipts",
   "rulingsDir": ".assay/rulings",
 
+  // Optional. When set, deliver runs this command before packaging and blocks if
+  // it exits non-zero. Use it to re-run the analysis or report build and fail
+  // when outputs changed beyond tolerance. Reproducibility means re-running work
+  // gets the same answer.
+  "reproCommand": "",
+
   // Governing docs are rule files the model may not rewrite during analysis.
   // govcheck snapshots these at discovery, then blocks delivery if any changed.
   "governingDocs": ["CLAUDE.md", "methodology.md", "docs/DECISIONS.md", "docs/spec/assay-spec.md"],

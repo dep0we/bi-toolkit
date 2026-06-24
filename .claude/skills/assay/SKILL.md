@@ -1,6 +1,6 @@
 ---
 name: assay
-description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: intake, frame, spec, discovery, execute, validate, deliver, or status.
+description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: intake, frame, spec, discovery, execute, validate, deliver, status, or finish.
 ---
 
 # /assay - BI quality loop router
@@ -255,6 +255,14 @@ If it fails, stop. Explain the missing proof or guarded-doc change in plain
 language. A guarded doc is a rule file protected from unattended edits. Do not
 deliver until the preflight passes.
 
+Delivery includes the reproducibility gate. Reproducibility means re-running
+work gets the same answer. If `assay.config.jsonc` has `reproCommand`, preflight
+runs that command and blocks delivery when it exits non-zero. Non-zero means the
+rerun found changed outputs or another failure. If `reproCommand` is unset,
+preflight passes with a note that reproducibility is unverified; for a data
+product, meaning a recurring report or dashboard, treat that note as a strong
+warning and recommend adding `reproCommand`.
+
 Delivery also requires data-safety proof when sensitive data is involved.
 Sensitive data means personal identifying info (PII), health info (PHI),
 payroll, or customer records. If the work is not clearly none or internal, call:
@@ -288,11 +296,58 @@ Then package the answer with:
 
 ### `/assay status`
 
-Read `.assay/receipts/` and report:
+For one analysis, call:
+
+```bash
+bash .claude/workflows/assay-state.sh status <analysis-id>
+```
+
+For all analyses, call:
+
+```bash
+bash .claude/workflows/assay-state.sh status
+```
+
+Report the helper output directly in plain language. Status means current saved
+progress and the next required step. The helper reads `.assay/receipts/` and
+`.assay/rulings/` and reports:
 
 - which stage receipts exist;
 - which gate would block next;
-- the next recommended subcommand.
+- open findings, meaning missing proof or failed scores;
+- the single next required step.
+
+When no analysis id is provided, list all in-flight analyses found under
+`.assay/` and their next step. In-flight means saved work exists and delivery is
+not yet proven complete in this session.
+
+### `/assay finish <analysis-id>`
+
+First report current state:
+
+```bash
+bash .claude/workflows/assay-state.sh finish <analysis-id>
+```
+
+Then resume only from the helper's `next required step`. Finish means continue a
+stalled analysis from saved proof. It must not recompute completed stages, and it
+must not bypass any gate. If the next step is:
+
+- `/assay spec <analysis-id>`: write or repair only the Stage 2 spec receipt.
+- `/assay discovery <analysis-id>`: run discovery preflight and discovery; do not
+  compute final results.
+- `record methodology rulings`: ask the operator to rule the surfaced forks and
+  write rulings with `rulings.sh`; do not execute.
+- `/assay validate <analysis-id>`: validate existing results when present,
+  repair failed validation, or raise low review scores; do not deliver.
+- `write data-safety receipt`: collect the audience, handling, destination,
+  detail level, and operator sign-off; do not deliver.
+- `/assay deliver <analysis-id>`: call deliver preflight exactly as `/assay
+  deliver` does, including validationcheck, datacheck, reprocheck, and govcheck.
+
+If `assay-state.sh finish` reports a blocking gate, explain it and drive the
+corrective next step only. A gate is a required stop-check before continuing.
+Never jump to a later stage because a previous output looks plausible.
 
 ## Receipt Names
 

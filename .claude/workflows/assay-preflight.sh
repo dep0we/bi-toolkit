@@ -33,6 +33,7 @@ case "$CHECKPOINT" in
   deliver)
     bash "$SCRIPT_DIR/validationcheck.sh" "$ID"
     bash "$SCRIPT_DIR/datacheck.sh" "$ID"
+    bash "$SCRIPT_DIR/reprocheck.sh" "$ID"
     bash "$SCRIPT_DIR/govcheck.sh" check "$ID"
     ;;
   *)

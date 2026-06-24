@@ -44,7 +44,7 @@ bash "$KIT/install.sh" "$T" >/dev/null 2>&1
 n=$(find "$T/.claude/skills" -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
 check "installs the /assay router + domain skills (>=31)" "[ \"$n\" -ge 31 ]"
 check "installs the engine workflows" "[ -f \"$T/.claude/workflows/assay-execute.js\" ] && [ -f \"$T/.claude/workflows/assay-validate.js\" ]"
-check "installs the gates + receipt/rulings writers" "[ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -f \"$T/.claude/workflows/rulings.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/datacheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
+check "installs the gates + receipt/rulings writers" "[ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -f \"$T/.claude/workflows/rulings.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/datacheck.sh\" ] && [ -f \"$T/.claude/workflows/reprocheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-state.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
 check "installs the data-safety policy doc" "[ -f \"$T/data-safety.md\" ]"
 check "installs active lesson loader" "[ -f \"$T/.claude/workflows/lesson-loader.js\" ]"
 check "installs the governing reminder hook script" "[ -x \"$T/.claude/hooks/governing-reminder.sh\" ]"
