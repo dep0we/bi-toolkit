@@ -21,6 +21,10 @@
 
   "receiptsDir": ".assay/receipts",
 
+  // Governing docs are rule files the model may not rewrite during analysis.
+  // govcheck snapshots these at discovery, then blocks delivery if any changed.
+  "governingDocs": ["CLAUDE.md", "methodology.md", "docs/DECISIONS.md", "docs/spec/assay-spec.md"],
+
   "highStakesDefinition": "High-stakes means the answer drives money, headcount, or strategy.",
 
   "scoreThresholds": {

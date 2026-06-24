@@ -29,7 +29,10 @@ if $CHECK; then
   missing=()
   for f in \
     ".claude/skills/assay/SKILL.md" \
+    ".claude/hooks/governing-reminder.sh" \
+    ".claude/workflows/assay-preflight.sh" \
     ".claude/workflows/receipt.sh" \
+    ".claude/workflows/govcheck.sh" \
     ".claude/workflows/questioncheck.sh" \
     ".claude/workflows/validationcheck.sh" \
     ".claude/workflows/assay-discovery.js" \
@@ -74,6 +77,129 @@ copy_if_missing() {
   fi
 }
 
+merge_governing_hook() {
+  local settings="$TARGET/.claude/settings.json"
+  local command='bash .claude/hooks/governing-reminder.sh'
+
+  if $DRY_RUN; then
+    say "  [dry-run] merge UserPromptSubmit hook into .claude/settings.json"
+    return
+  fi
+
+  mkdir -p "$TARGET/.claude"
+  if command -v python3 >/dev/null 2>&1; then
+    if result="$(python3 - "$settings" "$command" <<'PY'
+import json
+import os
+import sys
+import tempfile
+
+path, command = sys.argv[1:3]
+if os.path.exists(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as exc:
+        print(f"skip: existing .claude/settings.json is not readable JSON. JSON is a structured data file. {exc}")
+        raise SystemExit(3)
+    if not isinstance(data, dict):
+        print("skip: existing .claude/settings.json is not a JSON object. A JSON object is key-value data.")
+        raise SystemExit(3)
+else:
+    data = {}
+
+hooks = data.setdefault("hooks", {})
+if not isinstance(hooks, dict):
+    print("skip: existing hooks setting is not a JSON object. A JSON object is key-value data.")
+    raise SystemExit(3)
+entries = hooks.setdefault("UserPromptSubmit", [])
+if not isinstance(entries, list):
+    print("skip: existing UserPromptSubmit hooks setting is not a list.")
+    raise SystemExit(3)
+
+for entry in entries:
+    if isinstance(entry, dict):
+        for hook in entry.get("hooks", []):
+            if isinstance(hook, dict) and hook.get("type") == "command" and hook.get("command") == command:
+                print("already present: UserPromptSubmit governing reminder hook")
+                raise SystemExit(0)
+
+entries.append({"hooks": [{"type": "command", "command": command}]})
+os.makedirs(os.path.dirname(path), exist_ok=True)
+fd, tmp = tempfile.mkstemp(prefix=".settings.", suffix=".tmp", dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+except Exception:
+    try:
+        os.unlink(tmp)
+    except OSError:
+        pass
+    raise
+print("installed: UserPromptSubmit governing reminder hook")
+PY
+)"; then
+      say "  $result"
+    else
+      say "  hook merge skipped: $result"
+    fi
+  elif command -v node >/dev/null 2>&1; then
+    if result="$(node - "$settings" "$command" <<'NODE'
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const [settingsPath, command] = process.argv.slice(2);
+
+let data = {};
+if (fs.existsSync(settingsPath)) {
+  try {
+    data = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+  } catch (e) {
+    console.log(`skip: existing .claude/settings.json is not readable JSON. JSON is a structured data file. ${e.message}`);
+    process.exit(3);
+  }
+  if (!data || Array.isArray(data) || typeof data !== "object") {
+    console.log("skip: existing .claude/settings.json is not a JSON object. A JSON object is key-value data.");
+    process.exit(3);
+  }
+}
+if (data.hooks === undefined) data.hooks = {};
+if (!data.hooks || Array.isArray(data.hooks) || typeof data.hooks !== "object") {
+  console.log("skip: existing hooks setting is not a JSON object. A JSON object is key-value data.");
+  process.exit(3);
+}
+if (data.hooks.UserPromptSubmit === undefined) data.hooks.UserPromptSubmit = [];
+if (!Array.isArray(data.hooks.UserPromptSubmit)) {
+  console.log("skip: existing UserPromptSubmit hooks setting is not a list.");
+  process.exit(3);
+}
+const exists = data.hooks.UserPromptSubmit.some((entry) =>
+  entry && typeof entry === "object" && Array.isArray(entry.hooks) &&
+  entry.hooks.some((hook) => hook && hook.type === "command" && hook.command === command)
+);
+if (exists) {
+  console.log("already present: UserPromptSubmit governing reminder hook");
+  process.exit(0);
+}
+data.hooks.UserPromptSubmit.push({ hooks: [{ type: "command", command }] });
+fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+const tmp = path.join(path.dirname(settingsPath), `.settings.${process.pid}.${Date.now()}.tmp`);
+fs.writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`);
+fs.renameSync(tmp, settingsPath);
+console.log("installed: UserPromptSubmit governing reminder hook");
+NODE
+)"; then
+      say "  $result"
+    else
+      say "  hook merge skipped: $result"
+    fi
+  else
+    say "  hook merge skipped: python3 or node is required to merge .claude/settings.json without clobbering existing settings."
+  fi
+}
+
 # Copy every skill the kit ships — the /assay router AND the 31 domain skills —
 # not just the router. (arc is the dev-kit's machine-local loop, never shipped.)
 skill_count=0
@@ -91,7 +217,19 @@ for d in "$KIT"/.claude/skills/*/; do
 done
 say "  installed: .claude/skills/ ($skill_count skills, incl. the /assay router)"
 
-for f in receipt.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
+if [ -d "$KIT/.claude/hooks" ]; then
+  if $DRY_RUN; then
+    say "  [dry-run] copy .claude/hooks/"
+  else
+    mkdir -p "$TARGET/.claude/hooks"
+    cp -R "$KIT/.claude/hooks/." "$TARGET/.claude/hooks/"
+    chmod +x "$TARGET/.claude/hooks/governing-reminder.sh" 2>/dev/null || true
+  fi
+  say "  installed: .claude/hooks/"
+fi
+merge_governing_hook
+
+for f in assay-preflight.sh receipt.sh govcheck.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"

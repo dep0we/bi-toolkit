@@ -100,6 +100,8 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/receipt-install.XXXXXX")"
 bash "$INSTALL" "$T" >/dev/null
 missing=()
 for f in \
+  ".claude/workflows/assay-preflight.sh" \
+  ".claude/workflows/govcheck.sh" \
   ".claude/workflows/receipt.sh" \
   ".claude/workflows/assay-discovery.js" \
   ".claude/workflows/assay-execute.js" \

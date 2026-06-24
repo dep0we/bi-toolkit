@@ -36,6 +36,11 @@ Project-specific rules live in `assay.config.jsonc`. Receipts live in
 Always write receipts with `.claude/workflows/receipt.sh`; do not hand-write
 the files directly.
 
+The model must not bypass `.claude/workflows/assay-preflight.sh`. A preflight is
+a required gate check before a chokepoint, meaning a named stopping point in
+workflow. If preflight exits non-zero, STOP and explain the gate result in plain
+language; do not continue by calling a lower-level workflow directly.
+
 ## Plain-Language Rule
 
 Every operator-facing term must be defined inline in 4-8 words. Example:
@@ -120,6 +125,16 @@ JSON
 Find methodology forks before results are computed. Methodology means the chosen
 analysis approach. Escalate any fork that changes a number stakeholders act on.
 
+Before discovery, call:
+
+```bash
+bash .claude/workflows/assay-preflight.sh discovery <analysis-id>
+```
+
+If it fails, stop. Explain that the governing-doc baseline, meaning the saved
+starting copy for comparison, could not be created or confirmed. Do not bypass
+the preflight.
+
 Invoke `.claude/workflows/assay-discovery.js` with the analysis request, the
 Stage 2 spec receipt, and the config.
 
@@ -130,7 +145,7 @@ Do not compute final results in this stage.
 Before running work, call:
 
 ```bash
-bash .claude/workflows/questioncheck.sh <analysis-id>
+bash .claude/workflows/assay-preflight.sh execute <analysis-id>
 ```
 
 If it fails, stop. Explain that Stage 6 is blocked until the Stage 2 spec receipt
@@ -188,11 +203,12 @@ before delivery.
 Before packaging the answer, call:
 
 ```bash
-bash .claude/workflows/validationcheck.sh <analysis-id>
+bash .claude/workflows/assay-preflight.sh deliver <analysis-id>
 ```
 
-If it fails, stop. Explain the missing proof in plain language. Do not deliver
-until the gate passes.
+If it fails, stop. Explain the missing proof or guarded-doc change in plain
+language. A guarded doc is a rule file protected from unattended edits. Do not
+deliver until the preflight passes.
 
 Then package the answer with:
 
@@ -227,3 +243,6 @@ This installed skill routes the spine and gates. The installed workflow engines
 are `.claude/workflows/assay-discovery.js`,
 `.claude/workflows/assay-execute.js`, and
 `.claude/workflows/assay-validate.js`.
+The installed `UserPromptSubmit` hook prints a governing-rule reminder each
+turn. It keeps the rules visible, but it is not a hard block; the hard block is
+the non-zero exit from `.claude/workflows/assay-preflight.sh`.
