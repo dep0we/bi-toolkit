@@ -7,6 +7,7 @@ KIT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WRITER="$KIT/.claude/workflows/receipt.sh"
 QUESTION="$KIT/.claude/workflows/questioncheck.sh"
 VALIDATION="$KIT/.claude/workflows/validationcheck.sh"
+DATACHECK="$KIT/.claude/workflows/datacheck.sh"
 INSTALL="$KIT/install.sh"
 
 PASS=0
@@ -32,6 +33,15 @@ run_validation_gate() {
   rm -f "$errf"
 }
 
+run_data_gate() {
+  local dir="$1" id="$2" errf
+  errf="$(mktemp "${TMPDIR:-/tmp}/receipt-data.err.XXXXXX")"
+  OUT="$(cd "$dir" && bash "$DATACHECK" "$id" 2>"$errf")"
+  RC=$?
+  ERR="$(cat "$errf")"
+  rm -f "$errf"
+}
+
 echo "receipt writer tests"
 echo "===================="
 
@@ -52,6 +62,25 @@ if [ "$RC" -eq 0 ]; then
   pass "writer spec receipt passes questioncheck"
 else
   fail "expected written spec receipt to pass questioncheck (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/receipt.XXXXXX")"
+(cd "$T" && bash "$WRITER" data-safety "retention-q2" <<'JSON') >/dev/null
+{
+  "dataClassification": "customer",
+  "deliveryAudience": "internal retention leaders",
+  "dataLeavesCompany": false,
+  "exportDestination": "none",
+  "detailLevel": "aggregate",
+  "operatorSignoff": "operator approved this audience and handling"
+}
+JSON
+run_data_gate "$T" "retention-q2"
+if [ "$RC" -eq 0 ]; then
+  pass "writer data-safety receipt passes datacheck"
+else
+  fail "expected written data-safety receipt to pass datacheck (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
 rm -rf "$T"
 
@@ -102,6 +131,7 @@ missing=()
 for f in \
   ".claude/workflows/assay-preflight.sh" \
   ".claude/workflows/govcheck.sh" \
+  ".claude/workflows/datacheck.sh" \
   ".claude/workflows/receipt.sh" \
   ".claude/workflows/assay-discovery.js" \
   ".claude/workflows/assay-execute.js" \
@@ -111,7 +141,7 @@ done
 if [ "${#missing[@]}" -eq 0 ] && bash "$INSTALL" --check "$T" >/dev/null; then
   pass "installer copies receipt writer and assay workflows"
 else
-  fail "installer missed required files: ${missing[*]}"
+    fail "installer missed required files: ${missing[*]}"
 fi
 rm -rf "$T"
 

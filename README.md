@@ -70,13 +70,14 @@ The shared spine:
 DATA PRODUCT work also includes product design and refresh monitoring because a
 bad recurring number keeps repeating until someone catches it.
 
-The loop has two fail-closed gates. Fail-closed means the gate blocks until
+The loop has three fail-closed gates. Fail-closed means the gate blocks until
 proof exists.
 
 | Gate | Blocks | What must exist |
 | --- | --- | --- |
 | `questioncheck` | Stage 6 execution | A Stage 2 spec receipt. |
 | `validationcheck` | Stage 9 delivery | A validation receipt, plus a passing review score when required. |
+| `datacheck` | Stage 9 delivery | A data-safety receipt when sensitive data is involved. |
 
 `questioncheck` prevents execution without a spec receipt. The spec receipt
 records the question, metric definitions, valid answer, decision impact, and
@@ -86,12 +87,17 @@ track.
 For high-stakes work, meaning work that drives money, headcount, or strategy,
 and for DATA PRODUCT work, it also requires a passing adversarial-review receipt.
 
+`datacheck` prevents delivery when sensitive data is unclassified or lacks
+recorded handling. Sensitive data means personal identifying info (PII), health
+info (PHI), payroll, or customer records.
+
 Receipts are saved proof files under `.assay/receipts/`. The usual receipt files
 are:
 
 - `<analysis-id>-spec-receipt.json`
 - `<analysis-id>-validation-receipt.json`
 - `<analysis-id>-adversarial-review-receipt.json`
+- `<analysis-id>-data-safety-receipt.json`
 
 The review score has four dimensions:
 

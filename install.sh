@@ -36,12 +36,14 @@ if $CHECK; then
     ".claude/workflows/govcheck.sh" \
     ".claude/workflows/questioncheck.sh" \
     ".claude/workflows/validationcheck.sh" \
+    ".claude/workflows/datacheck.sh" \
     ".claude/workflows/assay-discovery.js" \
     ".claude/workflows/assay-execute.js" \
     ".claude/workflows/assay-validate.js" \
     ".claude/workflows/lesson-loader.js" \
     ".claude/workflows/decision-ledger.sh" \
-    "assay.config.jsonc"; do
+    "assay.config.jsonc" \
+    "data-safety.md"; do
     [ -e "$TARGET/$f" ] || missing+=("$f")
   done
   if [ "${#missing[@]}" -eq 0 ]; then
@@ -231,7 +233,7 @@ if [ -d "$KIT/.claude/hooks" ]; then
 fi
 merge_governing_hook
 
-for f in assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
+for f in assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
@@ -258,6 +260,7 @@ copy_if_missing "$KIT/PLAYBOOK.md" "$TARGET/PLAYBOOK.md" "PLAYBOOK.md"
 copy_if_missing "$KIT/methodology.md" "$TARGET/methodology.md" "methodology.md"
 copy_if_missing "$KIT/model-dial.md" "$TARGET/model-dial.md" "model-dial.md"
 copy_if_missing "$KIT/claude-md-guide.md" "$TARGET/claude-md-guide.md" "claude-md-guide.md"
+copy_if_missing "$KIT/data-safety.md" "$TARGET/data-safety.md" "data-safety.md"
 
 if $DRY_RUN; then
   say "  [dry-run] seed memory files"

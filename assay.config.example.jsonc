@@ -28,6 +28,16 @@
 
   "highStakesDefinition": "High-stakes means the answer drives money, headcount, or strategy.",
 
+  "dataSafety": {
+    "sensitiveDataDefinition": "Sensitive data means personal identifying info (PII), health info (PHI), payroll, or customer records.",
+    "defaultClassification": "unset",
+    "approvedExportDestinations": [
+      "company email",
+      "approved BI tool",
+      "approved shared drive"
+    ]
+  },
+
   "scoreThresholds": {
     "defaultMinDimension": 3,
     "allowRecordedAcceptance": true

@@ -28,6 +28,7 @@ write_config_and_doc() {
 {
   "governingDocs": ["GOV.md"],
   "sourceOfTruth": { "retention": "Finance system of record" },
+  "dataSafety": { "defaultClassification": "internal" },
   "scoreThresholds": { "defaultMinDimension": 3 }
 }
 JSON

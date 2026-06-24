@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Bundle 3 data-safety gate: `datacheck` now blocks delivery when sensitive BI
+  data lacks recorded audience, handling, export destination, detail level, and
+  operator sign-off; `receipt.sh` can write `data-safety` receipts, installs now
+  ship `datacheck.sh` and `data-safety.md`, and `/assay intake` captures data
+  classification defaults plus approved export destinations.
 - Bundle 2 durable methodology rulings: `/assay discovery` now records discovery
   run ids and surfaced fork ids, `/assay execute` now fails closed when rulings
   are missing, incomplete, or stale, and operators can explicitly reaffirm

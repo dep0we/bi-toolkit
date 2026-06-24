@@ -66,6 +66,11 @@ Interview the operator and fill in:
 - Validation habit, meaning how numbers are checked.
 - Stakeholders and delivery rules.
 - High-stakes examples, meaning work that drives money, headcount, or strategy.
+- Data classification defaults, meaning whether routine work is none, internal,
+  sensitive-PII (personal identifying info), sensitive-PHI (health info),
+  payroll, or customer records.
+- Approved export destinations, meaning places data may be sent outside the
+  analysis workspace.
 
 Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
 When drafting `CLAUDE.md`, copy the **Governing rules** section from
@@ -249,6 +254,28 @@ bash .claude/workflows/assay-preflight.sh deliver <analysis-id>
 If it fails, stop. Explain the missing proof or guarded-doc change in plain
 language. A guarded doc is a rule file protected from unattended edits. Do not
 deliver until the preflight passes.
+
+Delivery also requires data-safety proof when sensitive data is involved.
+Sensitive data means personal identifying info (PII), health info (PHI),
+payroll, or customer records. If the work is not clearly none or internal, call:
+
+```bash
+bash .claude/workflows/receipt.sh data-safety <analysis-id> <<'JSON'
+{
+  "dataClassification": "sensitive-PII",
+  "deliveryAudience": "internal finance leadership",
+  "dataLeavesCompany": false,
+  "exportDestination": "none",
+  "detailLevel": "aggregate",
+  "operatorSignoff": "operator approved this audience and handling"
+}
+JSON
+```
+
+The data-safety receipt records the audience, whether data leaves the company,
+the export destination, whether row-level records or aggregate summary is
+shared, and operator sign-off. If data leaves the company, the destination must
+be approved in `assay.config.jsonc`.
 
 Then package the answer with:
 
