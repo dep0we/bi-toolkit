@@ -75,6 +75,19 @@ write_config() {
 JSON
 }
 
+write_config_methodology_override() {
+  local dir="$1"
+  cat > "$dir/assay.config.jsonc" <<'JSON'
+{
+  "sourceOfTruth": { "retention": "Finance system of record" },
+  "scoreThresholds": {
+    "defaultMinDimension": 4,
+    "methodologySoundness": 2
+  }
+}
+JSON
+}
+
 echo "validationcheck tests"
 echo "====================="
 
@@ -112,6 +125,19 @@ if [ "$RC" -eq 0 ]; then
   pass "passes reconciled data product with passing score (source-of-truth configured)"
 else
   fail "expected passing validation (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/validationcheck.XXXXXX")"
+write_spec "$T" "analysis" "strategy decision"
+write_validation "$T" true
+write_review "$T" 2
+write_config_methodology_override "$T"
+run_gate "$T" "retention-q2"
+if [ "$RC" -eq 0 ]; then
+  pass "uses per-dimension threshold override with default fallback"
+else
+  fail "expected methodologySoundness override to pass (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
 rm -rf "$T"
 

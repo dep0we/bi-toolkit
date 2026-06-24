@@ -21,6 +21,7 @@ if (typeof A === 'string') { try { A = JSON.parse(A) } catch { A = {} } }
 const REQUEST = A.request ?? A.analysis ?? 'the current analysis request'
 const SPEC = A.spec ?? 'the current assay spec receipt'
 const CFG = A.config ?? {}
+const DISCOVERY_RUN_ID = A.discoveryRunId ?? A.discovery_run_id ?? `discovery-${new Date().toISOString().replace(/[:.]/g, '-')}`
 
 const PROJECT = CFG.projectName ?? 'this assay project'
 const DESIGN_DOCS = CFG.designDocs ?? 'CLAUDE.md, assay.config, the spec receipt, and any analysis notes already captured'
@@ -227,6 +228,8 @@ Set agreement to "converge" if both advisors point to the same option, else "div
 }))
 
 return {
+  discoveryRunId: DISCOVERY_RUN_ID,
+  surfacedForkIds: forks.map(f => f.id),
   request: REQUEST,
   codexUsed: CROSS_FAMILY,
   computedResults: false,

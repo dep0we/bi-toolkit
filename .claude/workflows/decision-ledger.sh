@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# decision-ledger.sh — standalone domain-neutral query tool for the arc decision ledger.
+# decision-ledger.sh - standalone query tool for the assay methodology ledger.
 #
 # Subcommands:
 #   decision-ledger.sh query  --issue <N>           # retrieve all decisions for an issue (exact id match)
 #   decision-ledger.sh query  --fork <forkId>        # retrieve a specific fork decision
-#   decision-ledger.sh match-rate [--domain <d>] [--class <c>]  # rolling match-rate per decision-class per domain
+#   decision-ledger.sh match-rate [--domain <d>] [--class <c>]  # rolling match-rate per BI decision class
 #   decision-ledger.sh list   [--issue <N>] [--domain <d>]      # list all records (optional filters)
 #   decision-ledger.sh append  <json-file>           # (trusted-skill use only) append one ledger record
 #
 # Naming rule: no code-specific words (review, build, PR, diff) in subcommand names.
 # Domain-neutral subcommands: query, match-rate, list, append.
 #
-# Ledger location: .gstack/arc-rulings/decisions.jsonl
+# Ledger location: <rulingsDir>/decisions.jsonl, default .assay/rulings/decisions.jsonl
 # Schema version: 1
 #
 # Schema (schemaVersion 1) — fields per JSONL record:
@@ -19,30 +19,32 @@
 #   issueId             : bare numeric id (normalized, e.g. "32")
 #   issueTitle          : full human-readable issue description (optional)
 #   forkId              : short kebab-case slug (required)
-#   domain              : "code" | "content" (required; default "code")
+#   domain              : "analysis" | "data-product" | "shared" (required; default "analysis")
 #   decisionType        : "tier-a" | "tier-b" (required)
-#   decisionClass       : spine class or domain subtype (required; "unclassified" if unknown)
+#   decisionClass       : metric-definition | source-of-truth | cohort-or-window |
+#                         null-or-outlier | statistical-method | segment-boundary |
+#                         refresh-cadence
 #   options             : array of option strings
 #   recommendation      : the recommendation offered to the operator
 #   timestamp           : ISO-8601 (required)
 #   project             : project name (optional)
-#   # Prediction fields (PRODUCED by the shadow-compare workflow, not persisted by it):
+#   # Prediction fields (produced by an advisory comparison, not persisted by it):
 #   predictedRuling     : option label the profile predicted (null if no prediction)
 #   predictionConfidence: float 0.0–1.0 or null
 #   challengeOutcome    : "agreed" | "pushed-back" | "unresolved" | null
 #   challengeReason     : the fresh-agent challenger's stated reason (single-line; null if none)
 #   challengeRan        : boolean
 #   challengeRanCrossFamily : boolean
-#   # Trusted ruling fields (written by /arc skill AFTER operator rules):
+#   # Trusted ruling fields (written by /assay skill AFTER operator rules):
 #   actualRuling        : the operator's chosen option (or agent's for Tier-B)
 #   rationale           : one-line rationale (single-line, newlines stripped)
 #   matchScore          : "exact" | "partial" | "miss" | null (null until actualRuling set)
 #
 # Single-writer flow (NOT two-phase):
-#   shadow-compare PRODUCES (does not persist) the prediction + challenge fields and
-#   RETURNS them to the trusted /arc skill. shadow-compare never touches this ledger.
-#   The /arc skill, AFTER the operator rules, writes ONE complete row per fork:
-#   the prediction fields from shadow-compare's return value + the trusted ruling
+#   The advisory comparison PRODUCES (does not persist) the prediction + challenge
+#   fields and RETURNS them to the trusted /assay skill. It never touches this
+#   ledger. The /assay skill, AFTER the operator rules, writes ONE complete row per fork:
+#   the prediction fields from the advisory return value + the trusted ruling
 #   fields (actualRuling, rationale, matchScore) it owns. There is exactly one
 #   writer (the skill) and one row per (issueId, forkId).
 #   Defensive de-dup: the query/match-rate tools still de-duplicate on
@@ -53,14 +55,19 @@
 # their defined default (missing matchScore → null; missing challengeRan → false).
 # Unknown fields are silently skipped (lenient on read, strict on write).
 #
-# Concurrent writes: the ledger assumes at-most-one writer (the trusted /arc skill
+# Concurrent writes: the ledger assumes at-most-one writer (the trusted /assay skill
 # serializes ledger appends). The query tool tolerates a partial last line by
 # skipping lines that do not parse as valid JSON rather than hard-aborting.
 
 set -euo pipefail
 
 SUBCOMMAND="${1:-}"
-LEDGER="${LEDGER_PATH:-.gstack/arc-rulings/decisions.jsonl}"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RULINGS_DIR="$(assay_config_path rulingsDir "${ASSAY_RULINGS_DIR:-}" ".assay/rulings" "$CONFIG")"
+LEDGER="${LEDGER_PATH:-$RULINGS_DIR/decisions.jsonl}"
 
 # Pick a JSON runner once.
 # Validation runner (for record writes): python3, else node. jq is intentionally
@@ -131,7 +138,7 @@ for i, line in enumerate(lines, 1):
     # Forward-compatible: missing schemaVersion treated as 1.
     sv = rec.get("schemaVersion", 1)
     if not isinstance(sv, int):
-        sys.stderr.write("decision-ledger: warning — line %d has unrecognized schemaVersion %r (processing anyway)\n" % (i, sv))
+        sys.stderr.write("decision-ledger: warning - line %d has unrecognized schemaVersion %r (processing anyway)\n" % (i, sv))
     # Forward defaults for optional fields.
     rec.setdefault("matchScore", None)
     rec.setdefault("challengeRan", False)
@@ -139,8 +146,8 @@ for i, line in enumerate(lines, 1):
     rec.setdefault("predictedRuling", None)
     rec.setdefault("challengeOutcome", None)
     rec.setdefault("challengeReason", None)
-    rec.setdefault("decisionClass", "unclassified")
-    rec.setdefault("domain", "code")
+    rec.setdefault("decisionClass", "metric-definition")
+    rec.setdefault("domain", "analysis")
     print(json.dumps(rec))
 PY
 }
@@ -171,8 +178,8 @@ lines.forEach((line, i) => {
   if (rec.predictedRuling === undefined) rec.predictedRuling = null;
   if (rec.challengeOutcome === undefined) rec.challengeOutcome = null;
   if (rec.challengeReason === undefined) rec.challengeReason = null;
-  if (rec.decisionClass === undefined) rec.decisionClass = "unclassified";
-  if (rec.domain === undefined) rec.domain = "code";
+  if (rec.decisionClass === undefined) rec.decisionClass = "metric-definition";
+  if (rec.domain === undefined) rec.domain = "analysis";
   process.stdout.write(JSON.stringify(rec) + "\n");
 });
 NODE
@@ -197,8 +204,8 @@ ledger_read_all() {
         | .predictedRuling      //= null
         | .challengeOutcome     //= null
         | .challengeReason      //= null
-        | .decisionClass        //= "unclassified"
-        | .domain               //= "code"
+        | .decisionClass        //= "metric-definition"
+        | .domain               //= "analysis"
       ' "$LEDGER" 2>/dev/null || true
       ;;
     python3) ledger_read_all_python ;;
@@ -334,8 +341,17 @@ if isinstance(sv, bool) or not isinstance(sv, (int, float)) or sv != 1:
     sys.stderr.write("decision-ledger: schemaVersion value must be 1\n")
     sys.exit(1)
 # domain enum.
-if rec.get("domain") not in ("code", "content"):
-    sys.stderr.write("decision-ledger: domain must be 'code' or 'content'\n")
+if rec.get("domain") not in ("analysis", "data-product", "shared"):
+    sys.stderr.write("decision-ledger: domain must be 'analysis', 'data-product', or 'shared'\n")
+    sys.exit(1)
+# BI decision-class enum.
+allowed_classes = {
+    "metric-definition", "source-of-truth", "cohort-or-window",
+    "null-or-outlier", "statistical-method", "segment-boundary",
+    "refresh-cadence",
+}
+if rec.get("decisionClass") not in allowed_classes:
+    sys.stderr.write("decision-ledger: decisionClass must be a BI class such as metric-definition or source-of-truth\n")
     sys.exit(1)
 # decisionType enum.
 if rec.get("decisionType") not in ("tier-a", "tier-b"):
@@ -411,8 +427,12 @@ if (typeof sv !== "number" || sv !== 1) {
   process.stderr.write("decision-ledger: schemaVersion value must be 1\n"); process.exit(1);
 }
 // domain enum.
-if (rec.domain !== "code" && rec.domain !== "content") {
-  process.stderr.write("decision-ledger: domain must be 'code' or 'content'\n"); process.exit(1);
+if (!["analysis","data-product","shared"].includes(rec.domain)) {
+  process.stderr.write("decision-ledger: domain must be 'analysis', 'data-product', or 'shared'\n"); process.exit(1);
+}
+// BI decision-class enum.
+if (!["metric-definition","source-of-truth","cohort-or-window","null-or-outlier","statistical-method","segment-boundary","refresh-cadence"].includes(rec.decisionClass)) {
+  process.stderr.write("decision-ledger: decisionClass must be a BI class such as metric-definition or source-of-truth\n"); process.exit(1);
 }
 // decisionType enum.
 if (!["tier-a","tier-b"].includes(rec.decisionType)) {
@@ -512,7 +532,7 @@ cmd_query() {
 
 # ---------------------------------------------------------------------------
 # Subcommand: match-rate — rolling match-rate grouped by domain + decisionClass
-# Usage: decision-ledger.sh match-rate [--domain code|content] [--class <spine>]
+# Usage: decision-ledger.sh match-rate [--domain analysis|data-product|shared] [--class <bi-class>]
 #
 # Only records with actualRuling AND predictedRuling AND matchScore are scored.
 # Reports: count of ran/not-ran challenger states, exact/partial/miss per group.
@@ -556,8 +576,8 @@ try:
             sys.stderr.write("decision-ledger: skipping malformed line %d\n" % i)
             continue
         r.setdefault("matchScore", None)
-        r.setdefault("domain", "code")
-        r.setdefault("decisionClass", "unclassified")
+        r.setdefault("domain", "analysis")
+        r.setdefault("decisionClass", "metric-definition")
         r.setdefault("challengeRan", False)
         records.append(r)
 except FileNotFoundError:
@@ -592,14 +612,14 @@ print("Total records: %d (after dedup)" % len(records))
 # Check for required field presence — flag missing rather than silently skip.
 for r in records:
     if not r.get("decisionClass"):
-        sys.stderr.write("decision-ledger: record forkId=%r is missing decisionClass — counted as 'unclassified'\n" % r.get("forkId"))
+        sys.stderr.write("decision-ledger: record forkId=%r is missing decisionClass - counted as 'metric-definition'\n" % r.get("forkId"))
     if not r.get("domain"):
-        sys.stderr.write("decision-ledger: record forkId=%r is missing domain — counted as 'code' (default)\n" % r.get("forkId"))
+        sys.stderr.write("decision-ledger: record forkId=%r is missing domain - counted as 'analysis' (default)\n" % r.get("forkId"))
 
 # Group scorable by (domain, decisionClass).
 groups = defaultdict(lambda: {"exact": 0, "partial": 0, "miss": 0, "total": 0})
 for r in scorable:
-    key = (r.get("domain","code"), r.get("decisionClass","unclassified"))
+    key = (r.get("domain","analysis"), r.get("decisionClass","metric-definition"))
     groups[key][r["matchScore"]] += 1
     groups[key]["total"] += 1
 
@@ -665,10 +685,10 @@ PY
         ( if ($scorable | length) == 0 then "  No scored Tier-A records yet."
           else
             ( $scorable
-              | group_by((.domain // "code") + " / " + (.decisionClass // "unclassified"))
+              | group_by((.domain // "analysis") + " / " + (.decisionClass // "metric-definition"))
               | .[]
               | {
-                  key: ((.[0].domain // "code") + " / " + (.[0].decisionClass // "unclassified")),
+                  key: ((.[0].domain // "analysis") + " / " + (.[0].decisionClass // "metric-definition")),
                   exact: (map(select(.matchScore=="exact")) | length),
                   partial: (map(select(.matchScore=="partial")) | length),
                   miss: (map(select(.matchScore=="miss")) | length),
@@ -717,7 +737,7 @@ const scorable = deduped
   .filter(r => r.decisionType === "tier-a" && ["exact","partial","miss"].includes(r.matchScore));
 const groups = {};
 scorable.forEach(r => {
-  const k = (r.domain||"code") + " / " + (r.decisionClass||"unclassified");
+  const k = (r.domain||"analysis") + " / " + (r.decisionClass||"metric-definition");
   if (!groups[k]) groups[k] = {exact:0,partial:0,miss:0,total:0};
   groups[k][r.matchScore]++; groups[k].total++;
 });
@@ -758,7 +778,7 @@ NODE
 
 # ---------------------------------------------------------------------------
 # Subcommand: list — enumerate records with optional filters
-# Usage: decision-ledger.sh list [--issue <N>] [--domain code|content]
+# Usage: decision-ledger.sh list [--issue <N>] [--domain analysis|data-product|shared]
 # ---------------------------------------------------------------------------
 cmd_list() {
   local filter_issue="" filter_domain=""
@@ -803,7 +823,7 @@ cmd_list() {
 
 # ---------------------------------------------------------------------------
 # Subcommand: append — write one complete, validated ledger record (atomic).
-# For TRUSTED /arc SKILL use only. The skill passes a JSON file containing the
+# For trusted /assay skill use only. The skill passes a JSON file containing the
 # full record; this tool validates it and appends atomically.
 # Usage: decision-ledger.sh append <json-file>
 # ---------------------------------------------------------------------------
@@ -897,23 +917,23 @@ case "$SUBCOMMAND" in
   append)     shift; cmd_append "$@" ;;
   ""|--help|-h)
     cat <<USAGE
-decision-ledger.sh — arc decision ledger query tool (domain-neutral)
+decision-ledger.sh - assay methodology decision ledger query tool
 
 Subcommands:
   query      --issue <N>           Retrieve all decisions for issue N (exact id match)
   query      --fork <forkId>       Retrieve a specific fork decision
-  match-rate [--domain code|content] [--class <spine>]
-                                   Rolling match-rate per decision-class per domain
-  list       [--issue <N>] [--domain code|content]
+  match-rate [--domain analysis|data-product|shared] [--class <bi-class>]
+                                   Rolling match-rate per BI decision class
+  list       [--issue <N>] [--domain analysis|data-product|shared]
                                    List all records (optional filters)
-  append     <json-file>           (trusted /arc skill only) Append one ledger record
+  append     <json-file>           (trusted /assay skill only) Append one ledger record
 
-Ledger: .gstack/arc-rulings/decisions.jsonl (gitignored runtime state)
+Ledger: <rulingsDir>/decisions.jsonl (gitignored runtime state)
 
 Examples (per AC #3 and AC #4):
   bash .claude/workflows/decision-ledger.sh query --issue 32
   bash .claude/workflows/decision-ledger.sh match-rate
-  bash .claude/workflows/decision-ledger.sh match-rate --domain code --class tech-choice
+  bash .claude/workflows/decision-ledger.sh match-rate --domain analysis --class source-of-truth
   bash .claude/workflows/decision-ledger.sh list --issue 32
 
 Schema: schemaVersion 1. See file header for full field list.

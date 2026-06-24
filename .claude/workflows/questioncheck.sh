@@ -4,12 +4,16 @@
 set -euo pipefail
 
 ID="${1:-}"
+CONFIG="${2:-assay.config.jsonc}"
 if [ -z "$ID" ]; then
-  echo "questioncheck: usage: questioncheck.sh <analysis-id>" >&2
+  echo "questioncheck: usage: questioncheck.sh <analysis-id> [assay.config.jsonc]" >&2
   exit 2
 fi
 
-RECEIPTS_DIR="${ASSAY_RECEIPTS_DIR:-.assay/receipts}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 RECEIPT="$RECEIPTS_DIR/${ID}-spec-receipt.json"
 
 gate() {

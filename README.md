@@ -26,6 +26,12 @@ curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh
 Then open Claude Code in that folder and run:
 
 ```text
+/assay help
+```
+
+When you are ready to set up the project, run:
+
+```text
 /assay intake
 ```
 
@@ -70,13 +76,16 @@ The shared spine:
 DATA PRODUCT work also includes product design and refresh monitoring because a
 bad recurring number keeps repeating until someone catches it.
 
-The loop has two fail-closed gates. Fail-closed means the gate blocks until
+The loop has three fail-closed gates. Fail-closed means the gate blocks until
 proof exists.
 
 | Gate | Blocks | What must exist |
 | --- | --- | --- |
 | `questioncheck` | Stage 6 execution | A Stage 2 spec receipt. |
 | `validationcheck` | Stage 9 delivery | A validation receipt, plus a passing review score when required. |
+| `govcheck` | Stage 9 delivery | No protected governing docs changed during the analysis. |
+| `datacheck` | Stage 9 delivery | A data-safety receipt when sensitive data is involved. |
+| `reprocheck` | Stage 9 delivery | The optional `reproCommand` exits zero when configured. |
 
 `questioncheck` prevents execution without a spec receipt. The spec receipt
 records the question, metric definitions, valid answer, decision impact, and
@@ -86,12 +95,17 @@ track.
 For high-stakes work, meaning work that drives money, headcount, or strategy,
 and for DATA PRODUCT work, it also requires a passing adversarial-review receipt.
 
-Receipts are saved proof files under `.assay/receipts/`. The usual receipt files
-are:
+`datacheck` prevents delivery when sensitive data is unclassified or lacks
+recorded handling. Sensitive data means personal identifying info (PII), health
+info (PHI), payroll, or customer records.
+
+Receipts are saved proof files under `receiptsDir`, defaulting to
+`.assay/receipts/`. The usual receipt files are:
 
 - `<analysis-id>-spec-receipt.json`
 - `<analysis-id>-validation-receipt.json`
 - `<analysis-id>-adversarial-review-receipt.json`
+- `<analysis-id>-data-safety-receipt.json`
 
 The review score has four dimensions:
 
@@ -124,6 +138,7 @@ that choice before computing results.
 
 | Command | What it does |
 | --- | --- |
+| `/assay help` | Explains the kit in plain language and shows the next required step. |
 | `/assay intake` | Captures the BI stack, source-of-truth list, validation habits, stakeholders, and delivery rules. |
 | `/assay frame` | Chooses ANALYSIS or DATA PRODUCT and names the decision the work supports. |
 | `/assay spec` | Writes the spec receipt with the question, metrics, scope, and valid answer. |
@@ -132,6 +147,8 @@ that choice before computing results.
 | `/assay validate` | Reconciles results to source-of-truth and writes validation evidence. |
 | `/assay deliver` | Packages the final answer after `validationcheck` passes. |
 | `/assay status` | Shows existing receipts, blocking gates, and the next recommended step. |
+| `/assay resume` | Continues the active analysis from its saved next step. |
+| `/assay ledger` | Lists or queries ruled methodology choices. |
 
 ## 6. The skills
 
@@ -192,6 +209,13 @@ higher than the cost of review.
 ## 9. Everyday usage
 
 Example: answer "Why did Q2 renewal revenue drop?"
+
+```text
+/assay help
+```
+
+Use this anytime you are unsure what to do next. The installed hook also prints
+the active analysis and next required step at every turn.
 
 ```text
 /assay intake

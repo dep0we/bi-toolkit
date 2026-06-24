@@ -30,7 +30,7 @@ by default.
 | 6 | Execute | Shared | Run the analysis or build the report using the locked decisions. Delegate profiling, counting, and queries to worker sub-agents. | `questioncheck` |
 | 7 | Validate | Shared | Reconcile results to source-of-truth, meaning numbers match the official source or differences are explained. Use the `reconciler` sub-agent; do not self-check. | Required before Stage 9 |
 | 8 | Review + Score | Shared | Red-team the conclusion with a fresh `red-teamer` sub-agent that did not produce the numbers. Score confidence, completeness, methodology, and reproducibility. | Required for every non-trivial analysis (not approved as too small to gate) |
-| 9 | Deliver | Shared | Package the answer, charts, caveats, and next steps for the audience. | `validationcheck` |
+| 9 | Deliver | Shared | Package the answer, charts, caveats, and next steps for the audience. | `validationcheck` + `govcheck` + `datacheck` + `reprocheck` |
 | 10 | Monitor | Data Product | Check refreshes and metric drift, meaning numbers move unexpectedly. | - |
 | 11 | Document | Shared | Record assumptions, queries, decisions, and validation notes. | - |
 | 12 | Retro | Shared | Capture lessons for the next analysis. | - |
@@ -43,7 +43,7 @@ by default.
 scorecard. A data product gets stricter review because a wrong number repeats
 until someone catches it.
 
-## The Two Gates
+## The Delivery Gates
 
 `questioncheck` runs before Stage 6. It fails closed when no Stage 2 spec receipt
 exists. Failing closed means the script stops the next step unless proof exists.
@@ -58,6 +58,13 @@ that attacks the answer.
 High-stakes work means work that drives money, headcount, or strategy. The gate
 decides that from the spec receipt's decision-impact field, not from an operator
 bypass.
+
+`datacheck` runs before Stage 9. It fails closed when data classification is
+unknown, when sensitive data lacks a data-safety receipt, when the handling is
+incomplete, or when data leaves the company for an unapproved destination.
+Sensitive data means personal identifying info (PII), health info (PHI),
+payroll, or customer records. Handling means audience, export destination,
+row-level detail or aggregate summary, and operator sign-off.
 
 ## Score Rubric
 

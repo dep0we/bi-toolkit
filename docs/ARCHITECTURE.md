@@ -17,21 +17,30 @@ The spine is the shared lifecycle and enforcement layer:
   payloads for the back gate.
 - `.claude/workflows/receipt.sh` writes receipt files in the exact format the
   gates read.
+- `.claude/workflows/assay-state.sh` reads receipts and rulings to summarize
+  status, meaning saved progress and next required step.
 - `.claude/workflows/questioncheck.sh` blocks Stage 6 without a spec receipt.
 - `.claude/workflows/validationcheck.sh` blocks Stage 9 without reconciliation
   and required review scores.
-- `.claude/workflows/decision-ledger.sh` is copied from the dev-process kit as a
-  reusable ledger query tool.
+- `.claude/workflows/govcheck.sh` blocks delivery when protected governing docs
+  changed after discovery.
+- `.claude/workflows/datacheck.sh` blocks delivery without required sensitive-
+  data handling proof.
+- `.claude/workflows/reprocheck.sh` optionally runs `reproCommand` before
+  delivery. Reproducibility means re-running work gets the same answer.
+- `.claude/workflows/decision-ledger.sh` queries ledger rows appended by ruled
+  methodology forks.
 
 ## Operator Config
 
 `assay.config.example.jsonc` becomes `assay.config.jsonc` in an installed
-project. It captures stack, source-of-truth, tripwires, review lenses, thresholds,
-meaning minimum passing scores, and high-stakes rules. Source-of-truth means the
-official place to compare against.
+project. It captures stack, source-of-truth, `receiptsDir`, `rulingsDir`,
+`reproCommand`, tripwires, review lenses, thresholds, meaning minimum passing
+scores, and high-stakes rules. Source-of-truth means the official place to
+compare against.
 
-Runtime receipts live under `.assay/receipts/` and are gitignored. A receipt is a
-saved proof file for a completed stage.
+Runtime receipts default to `.assay/receipts/` and are gitignored. A receipt is
+a saved proof file for a completed stage.
 
 ## Install Contract
 

@@ -1,6 +1,6 @@
 ---
 name: assay
-description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: intake, frame, spec, discovery, execute, validate, deliver, or status.
+description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: help, intake, frame, spec, discovery, execute, validate, deliver, status, finish, resume, or ledger.
 ---
 
 # /assay - BI quality loop router
@@ -30,11 +30,20 @@ operator explicitly approves a named exception.
    `eda-profiler` and `query-runner` sub-agents (worker agents given narrow
    tasks; cheaper model). The main model (the agent leading judgment) plans,
    interprets, synthesizes — it does not run crunching scripts inline.
+4. **Orient new or confused operators.** If the operator seems new, seems
+   confused, or asks a data question without using `/assay`, briefly explain
+   that the kit will guide them step by step, then start the loop with
+   `/assay intake` or `/assay frame`. Do not lecture; take their hand.
 
 Project-specific rules live in `assay.config.jsonc`. Receipts live in
-`.assay/receipts/`. A receipt is a saved proof file for a completed stage.
-Always write receipts with `.claude/workflows/receipt.sh`; do not hand-write
-the files directly.
+the configured receipts directory, defaulting to `.assay/receipts/`. A receipt
+is a saved proof file for a completed stage. Always write receipts with
+`.claude/workflows/receipt.sh`; do not hand-write the files directly.
+
+The model must not bypass `.claude/workflows/assay-preflight.sh`. A preflight is
+a required gate check before a chokepoint, meaning a named stopping point in
+workflow. If preflight exits non-zero, STOP and explain the gate result in plain
+language; do not continue by calling a lower-level workflow directly.
 
 ## Plain-Language Rule
 
@@ -52,6 +61,24 @@ Before every subcommand:
 
 ## Subcommands
 
+### `/assay help`
+
+Show the plain-language guide and exact next step:
+
+```bash
+bash .claude/workflows/assay-help.sh
+```
+
+If the operator provides an analysis id, pass it through:
+
+```bash
+bash .claude/workflows/assay-help.sh <analysis-id>
+```
+
+Report the helper output directly. Help explains what the kit is, the lifecycle
+one stage at a time, and the next required step from `assay-state.sh`. If no
+active analysis or receipts exist, point the operator to `/assay intake`.
+
 ### `/assay intake`
 
 Interview the operator and fill in:
@@ -61,6 +88,11 @@ Interview the operator and fill in:
 - Validation habit, meaning how numbers are checked.
 - Stakeholders and delivery rules.
 - High-stakes examples, meaning work that drives money, headcount, or strategy.
+- Data classification defaults, meaning whether routine work is none, internal,
+  sensitive-PII (personal identifying info), sensitive-PHI (health info),
+  payroll, or customer records.
+- Approved export destinations, meaning places data may be sent outside the
+  analysis workspace.
 
 Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
 When drafting `CLAUDE.md`, copy the **Governing rules** section from
@@ -77,9 +109,18 @@ Decide whether the request is:
 Capture the decision the answer supports. If no decision exists, recommend
 stopping or reframing.
 
+Set the active analysis pointer after the analysis id and track are known:
+
+```bash
+bash .claude/workflows/assay-active.sh set <analysis-id> <analysis|data-product>
+```
+
+The active pointer is `.assay/active.json`. It lets a fresh session know which
+analysis to resume first.
+
 ### `/assay spec`
 
-Write the Stage 2 spec receipt under `.assay/receipts/` by calling:
+Write the Stage 2 spec receipt with the receipt writer by calling:
 
 ```bash
 bash .claude/workflows/receipt.sh spec <analysis-id> <<'JSON'
@@ -115,26 +156,86 @@ bash .claude/workflows/receipt.sh trivial <analysis-id> <<'JSON'
 JSON
 ```
 
+After writing either receipt, set the active analysis pointer. Use the receipt's
+track when present; otherwise use `analysis`:
+
+```bash
+bash .claude/workflows/assay-active.sh set <analysis-id> <analysis|data-product>
+```
+
 ### `/assay discovery`
 
 Find methodology forks before results are computed. Methodology means the chosen
 analysis approach. Escalate any fork that changes a number stakeholders act on.
+
+Before discovery, call:
+
+```bash
+bash .claude/workflows/assay-preflight.sh discovery <analysis-id>
+```
+
+If it fails, stop. Explain that the governing-doc baseline, meaning the saved
+starting copy for comparison, could not be created or confirmed. Do not bypass
+the preflight.
 
 Invoke `.claude/workflows/assay-discovery.js` with the analysis request, the
 Stage 2 spec receipt, and the config.
 
 Do not compute final results in this stage.
 
+After discovery returns, record the latest discovery run before execute:
+
+```bash
+bash .claude/workflows/rulings.sh discovery <analysis-id> <discoveryRunId> <<'JSON'
+["fork-id-one", "fork-id-two"]
+JSON
+```
+
+Ask the operator to rule every Tier-A fork. Then write the durable rulings file:
+
+```bash
+bash .claude/workflows/rulings.sh write <analysis-id> <discoveryRunId> <<'JSON'
+{
+  "forkIds": ["fork-id-one", "fork-id-two"],
+  "rulings": {
+    "fork-id-one": {
+      "ruling": "approved option",
+      "rationale": "why the operator chose it"
+    },
+    "fork-id-two": "approved option"
+  }
+}
+JSON
+```
+
+This creates `<rulingsDir>/<analysis-id>-rulings.json`, defaulting to
+`.assay/rulings/<analysis-id>-rulings.json`. A ruling is the operator's
+approved method choice.
+The rulings writer also appends one decision-ledger row for each ruled Tier-A
+fork. The ledger is an audit trail of method choices.
+
 ### `/assay execute`
 
 Before running work, call:
 
 ```bash
-bash .claude/workflows/questioncheck.sh <analysis-id>
+bash .claude/workflows/assay-preflight.sh execute <analysis-id>
 ```
 
 If it fails, stop. Explain that Stage 6 is blocked until the Stage 2 spec receipt
-exists. Do not bypass the gate.
+exists and every surfaced Tier-A methodology fork has a current ruling. A
+methodology fork is a choice that changes numbers. Do not bypass the gate.
+
+If discovery was deliberately rerun and the old rulings still apply, get the
+operator's explicit approval and re-affirm the current rulings:
+
+```bash
+bash .claude/workflows/rulings.sh reaffirm <analysis-id> <<'JSON'
+{
+  "reason": "operator confirmed these rulings still apply after rerun"
+}
+JSON
+```
 
 Then run the analysis or build the data product according to the spec and ruled
 methodology. **Delegate the mechanical work to sub-agents** (they run on a
@@ -160,7 +261,7 @@ analysis does NOT satisfy this stage — it cannot catch its own blind spots.
 Invoke `.claude/workflows/assay-validate.js` with the analysis request, Stage 2
 spec receipt, results, and config.
 
-Write the Stage 7 validation receipt under `.assay/receipts/` by passing the
+Write the Stage 7 validation receipt with the receipt writer by passing the
 workflow's `validationReceipt` to:
 
 ```bash
@@ -188,11 +289,42 @@ before delivery.
 Before packaging the answer, call:
 
 ```bash
-bash .claude/workflows/validationcheck.sh <analysis-id>
+bash .claude/workflows/assay-preflight.sh deliver <analysis-id>
 ```
 
-If it fails, stop. Explain the missing proof in plain language. Do not deliver
-until the gate passes.
+If it fails, stop. Explain the missing proof or guarded-doc change in plain
+language. A guarded doc is a rule file protected from unattended edits. Do not
+deliver until the preflight passes.
+
+Delivery includes the reproducibility gate. Reproducibility means re-running
+work gets the same answer. If `assay.config.jsonc` has `reproCommand`, preflight
+runs that command and blocks delivery when it exits non-zero. Non-zero means the
+rerun found changed outputs or another failure. If `reproCommand` is unset,
+preflight passes with a note that reproducibility is unverified; for a data
+product, meaning a recurring report or dashboard, treat that note as a strong
+warning and recommend adding `reproCommand`.
+
+Delivery also requires data-safety proof when sensitive data is involved.
+Sensitive data means personal identifying info (PII), health info (PHI),
+payroll, or customer records. If the work is not clearly none or internal, call:
+
+```bash
+bash .claude/workflows/receipt.sh data-safety <analysis-id> <<'JSON'
+{
+  "dataClassification": "sensitive-PII",
+  "deliveryAudience": "internal finance leadership",
+  "dataLeavesCompany": false,
+  "exportDestination": "none",
+  "detailLevel": "aggregate",
+  "operatorSignoff": "operator approved this audience and handling"
+}
+JSON
+```
+
+The data-safety receipt records the audience, whether data leaves the company,
+the export destination, whether row-level records or aggregate summary is
+shared, and operator sign-off. If data leaves the company, the destination must
+be approved in `assay.config.jsonc`.
 
 Then package the answer with:
 
@@ -203,13 +335,99 @@ Then package the answer with:
 - reconciliation notes;
 - next steps.
 
+After the answer is successfully delivered, clear the active analysis pointer:
+
+```bash
+bash .claude/workflows/assay-active.sh clear <analysis-id>
+```
+
+Do not clear it when a preflight, validation, data-safety, reproducibility, or
+governing-doc check fails.
+
 ### `/assay status`
 
-Read `.assay/receipts/` and report:
+For one analysis, call:
+
+```bash
+bash .claude/workflows/assay-state.sh status <analysis-id>
+```
+
+For all analyses, call:
+
+```bash
+bash .claude/workflows/assay-state.sh status
+```
+
+Report the helper output directly in plain language. Status means current saved
+progress and the next required step. The helper reads the configured receipts
+and rulings directories and reports:
 
 - which stage receipts exist;
 - which gate would block next;
-- the next recommended subcommand.
+- open findings, meaning missing proof or failed scores;
+- the single next required step.
+
+When no analysis id is provided, list all in-flight analyses found under
+`.assay/` and their next step. In-flight means saved work exists and delivery is
+not yet proven complete in this session.
+
+### `/assay finish <analysis-id>`
+
+First report current state:
+
+```bash
+bash .claude/workflows/assay-state.sh finish <analysis-id>
+```
+
+Then resume only from the helper's `next required step`. Finish means continue a
+stalled analysis from saved proof. It must not recompute completed stages, and it
+must not bypass any gate. If the next step is:
+
+- `/assay spec <analysis-id>`: write or repair only the Stage 2 spec receipt.
+- `/assay discovery <analysis-id>`: run discovery preflight and discovery; do not
+  compute final results.
+- `record methodology rulings`: ask the operator to rule the surfaced forks and
+  write rulings with `rulings.sh`; do not execute.
+- `/assay validate <analysis-id>`: validate existing results when present,
+  repair failed validation, or raise low review scores; do not deliver.
+- `write data-safety receipt`: collect the audience, handling, destination,
+  detail level, and operator sign-off; do not deliver.
+- `/assay deliver <analysis-id>`: call deliver preflight exactly as `/assay
+  deliver` does, including validationcheck, govcheck, datacheck, and reprocheck.
+
+If `assay-state.sh finish` reports a blocking gate, explain it and drive the
+corrective next step only. A gate is a required stop-check before continuing.
+Never jump to a later stage because a previous output looks plausible.
+
+### `/assay resume [analysis-id]`
+
+Resume is an alias for finish. If an analysis id is supplied, treat it exactly
+like `/assay finish <analysis-id>`. If no id is supplied, use the active pointer:
+
+```bash
+bash .claude/workflows/assay-state.sh resume
+```
+
+Then continue only from the helper's next required step. If no active analysis
+exists, run `/assay status` or `/assay help`.
+
+### `/assay ledger`
+
+Query the methodology decision ledger, meaning the saved list of ruled forks:
+
+```bash
+bash .claude/workflows/decision-ledger.sh list
+```
+
+If the operator provides a filter, pass it through to the ledger helper:
+
+```bash
+bash .claude/workflows/decision-ledger.sh query --issue <analysis-id>
+bash .claude/workflows/decision-ledger.sh query --fork <fork-id>
+bash .claude/workflows/decision-ledger.sh match-rate
+```
+
+Report the helper output directly in plain language.
 
 ## Receipt Names
 
@@ -217,9 +435,9 @@ Use a stable analysis id such as `revenue-retention-q2`.
 
 Receipt files:
 
-- `.assay/receipts/<analysis-id>-spec-receipt.json`
-- `.assay/receipts/<analysis-id>-validation-receipt.json`
-- `.assay/receipts/<analysis-id>-adversarial-review-receipt.json`
+- `<receiptsDir>/<analysis-id>-spec-receipt.json`
+- `<receiptsDir>/<analysis-id>-validation-receipt.json`
+- `<receiptsDir>/<analysis-id>-adversarial-review-receipt.json`
 
 ## Installed Components
 
@@ -227,3 +445,7 @@ This installed skill routes the spine and gates. The installed workflow engines
 are `.claude/workflows/assay-discovery.js`,
 `.claude/workflows/assay-execute.js`, and
 `.claude/workflows/assay-validate.js`.
+The installed `UserPromptSubmit` hook prints a governing-rule reminder and the
+current active-analysis state each turn. It keeps the rules and next step
+visible, but it is not a hard block; the hard block is the non-zero exit from
+`.claude/workflows/assay-preflight.sh`.

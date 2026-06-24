@@ -149,7 +149,7 @@ Engine under `.claude/` (note: dev-kit gitignores `.claude/workflows/` and the
 skill in target repos, but THIS repo is the kit's source, so these are COMMITTED
 here — adjust `.gitignore` so the kit's own engine files are tracked):
 `.claude/skills/assay/SKILL.md` (router: `/assay intake|frame|spec|discovery|
-execute|validate|deliver|status`), `.claude/workflows/assay-discovery.js`,
+execute|validate|deliver|status|finish`), `.claude/workflows/assay-discovery.js`,
 `.claude/workflows/assay-execute.js`, `.claude/workflows/assay-validate.js`,
 `.claude/workflows/questioncheck.sh`, `.claude/workflows/validationcheck.sh`,
 `.claude/workflows/decision-ledger.sh` (reuse).

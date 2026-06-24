@@ -1,7 +1,10 @@
+import { lessonBrief, lessonLoaderPrompt } from './lesson-loader.js'
+
 export const meta = {
   name: 'assay-validate',
   description: 'Phase 7/8 of the assay loop. Reconciles results to source-of-truth and scores confidence (how sure the answer is right), data completeness (how much relevant data was present), methodology soundness (whether the approach survives expert review), and reproducibility (can someone re-run the same work). Blocks below threshold (minimum allowed score).',
   phases: [
+    { title: 'Lessons' },
     { title: 'Reconcile' },
     { title: 'Score' },
     { title: 'Gate' },
@@ -24,8 +27,14 @@ const RESULTS = A.results ?? A.artifacts ?? 'the current result artifacts'
 const CFG = A.config ?? {}
 const PROJECT = CFG.projectName ?? 'this assay project'
 const SOURCE_OF_TRUTH = CFG.sourceOfTruth ?? {}
-const THRESHOLDS = CFG.scoreThresholds ?? { confidence: 3, dataCompleteness: 3, methodologySoundness: 3, reproducibility: 3 }
+const THRESHOLDS = CFG.scoreThresholds ?? { defaultMinDimension: 3 }
 const HIGH_STAKES = A.highStakes ?? false
+
+function thresholdFor (key) {
+  const thresholds = THRESHOLDS && typeof THRESHOLDS === 'object' ? THRESHOLDS : {}
+  const fallback = typeof thresholds.defaultMinDimension === 'number' ? thresholds.defaultMinDimension : 3
+  return typeof thresholds[key] === 'number' ? thresholds[key] : fallback
+}
 
 const PLAIN_LANGUAGE_RULE = `Every operator-facing sentence must define technical or statistical terms inline in 4-8 words, for example "variance (difference from expected value)", and must frame choices by business consequence, not jargon.`
 
@@ -131,6 +140,14 @@ const REVIEW_SCHEMA = {
   },
 }
 
+phase('Lessons')
+const LESSONS_RAW = await agent(
+  lessonLoaderPrompt({ project: PROJECT, request: REQUEST, phase: 'validate' }),
+  { label: 'load-active-lessons', phase: 'Lessons', model: 'sonnet' },
+)
+const LESSONS = lessonBrief(LESSONS_RAW)
+log(LESSONS ? 'Loaded active BI lessons - injecting into reconcile/score/review' : 'No active BI lessons found - proceeding without lesson brief')
+
 phase('Reconcile')
 const reconciliation = await agent(
   `Act as the Sonnet reconciler worker for ${PROJECT}. Reconcile every reported result to source-of-truth (authoritative system used to verify).
@@ -138,6 +155,7 @@ REQUEST: ${REQUEST}
 SPEC: ${SPEC}
 RESULTS OR ARTIFACTS: ${JSON.stringify(RESULTS)}
 SOURCE OF TRUTH MAP: ${JSON.stringify(SOURCE_OF_TRUTH)}
+${LESSONS}
 
 For each result, identify the source-of-truth, rerun or inspect the needed check, record evidence, and mark unmatched or not-checked results clearly. Variance means difference from expected value; explain every variance in plain language.
 ${PLAIN_LANGUAGE_RULE}`,
@@ -175,6 +193,7 @@ SPEC: ${SPEC}
 RECONCILIATION RECEIPT: ${reconciliation.receipt}
 CHECKS: ${JSON.stringify(reconciliation.checks, null, 2)}
 VARIANCES: ${JSON.stringify(reconciliation.variances, null, 2)}
+${LESSONS}
 
 Dimensions:
 - confidence: how sure we are the answer is right, considering sample size (how many records), noise (random movement), and sensitivity (how much the result changes when assumptions move).
@@ -192,6 +211,7 @@ REQUEST: ${REQUEST}
 SPEC: ${SPEC}
 RECONCILIATION: ${JSON.stringify(reconciliation)}
 SCORE: ${JSON.stringify(score)}
+${LESSONS}
 
 Find any overclaim, missing source-of-truth check, weak method, data gap, or reproducibility gap. P0/P1 blocks delivery; P2 reports non-blocking improvements.
 ${PLAIN_LANGUAGE_RULE}`,
@@ -201,10 +221,10 @@ ${PLAIN_LANGUAGE_RULE}`,
 phase('Gate')
 const scores = score?.scores ?? {}
 const belowThreshold = [
-  ['confidence', scores.confidence?.score, THRESHOLDS.confidence ?? 3],
-  ['data-completeness', scores.dataCompleteness?.score, THRESHOLDS.dataCompleteness ?? 3],
-  ['methodology-soundness', scores.methodologySoundness?.score, THRESHOLDS.methodologySoundness ?? 3],
-  ['reproducibility', scores.reproducibility?.score, THRESHOLDS.reproducibility ?? 3],
+  ['confidence', scores.confidence?.score, thresholdFor('confidence')],
+  ['data-completeness', scores.dataCompleteness?.score, thresholdFor('dataCompleteness')],
+  ['methodology-soundness', scores.methodologySoundness?.score, thresholdFor('methodologySoundness')],
+  ['reproducibility', scores.reproducibility?.score, thresholdFor('reproducibility')],
 ].filter(([, actual, threshold]) => typeof actual !== 'number' || actual < threshold)
 
 const blockingFindings = (redTeam?.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1')

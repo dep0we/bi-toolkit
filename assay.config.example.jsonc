@@ -19,12 +19,39 @@
 
   "baseBranch": "main",
 
+  // Gate readers and writers use these first, then env vars, then defaults.
   "receiptsDir": ".assay/receipts",
+  "rulingsDir": ".assay/rulings",
+
+  // Optional. When set, deliver runs this command before packaging and blocks if
+  // it exits non-zero. Use it to re-run the analysis or report build and fail
+  // when outputs changed beyond tolerance. Reproducibility means re-running work
+  // gets the same answer.
+  "reproCommand": "",
+
+  // Governing docs are rule files the model may not rewrite during analysis.
+  // govcheck snapshots these at discovery, then blocks delivery if any changed.
+  "governingDocs": ["CLAUDE.md", "methodology.md", "docs/DECISIONS.md", "docs/spec/assay-spec.md"],
 
   "highStakesDefinition": "High-stakes means the answer drives money, headcount, or strategy.",
 
+  "dataSafety": {
+    "sensitiveDataDefinition": "Sensitive data means personal identifying info (PII), health info (PHI), payroll, or customer records.",
+    "defaultClassification": "unset",
+    "approvedExportDestinations": [
+      "company email",
+      "approved BI tool",
+      "approved shared drive"
+    ]
+  },
+
   "scoreThresholds": {
     "defaultMinDimension": 3,
+    // Optional per-dimension overrides. Omit a key to use defaultMinDimension.
+    "confidence": 3,
+    "dataCompleteness": 3,
+    "methodologySoundness": 3,
+    "reproducibility": 3,
     "allowRecordedAcceptance": true
   },
 

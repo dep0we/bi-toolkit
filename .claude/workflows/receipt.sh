@@ -6,10 +6,14 @@ set -euo pipefail
 KIND="${1:-}"
 ID="${2:-}"
 SOURCE="${3:-}"
-RECEIPTS_DIR="${ASSAY_RECEIPTS_DIR:-.assay/receipts}"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 
 usage() {
-  echo "receipt.sh: usage: receipt.sh <spec|trivial|validation|adversarial-review> <analysis-id> [json-file]" >&2
+  echo "receipt.sh: usage: receipt.sh <spec|trivial|validation|adversarial-review|data-safety> <analysis-id> [json-file]" >&2
   echo "receipt.sh: pass JSON on stdin when no json-file is given. JSON is a structured data file." >&2
   exit 2
 }
@@ -24,7 +28,7 @@ case "$ID" in
 esac
 
 case "$KIND" in
-  spec|trivial|validation|adversarial-review) ;;
+  spec|trivial|validation|adversarial-review|data-safety) ;;
   *) usage ;;
 esac
 
@@ -70,6 +74,43 @@ def require_text(obj, key):
     if not isinstance(value, str) or not value.strip():
         fail(f"{kind} receipt needs '{key}'")
 
+def clean_class(value):
+    raw = str(value or "").strip()
+    aliases = {
+        "pii": "sensitive-PII",
+        "sensitive-pii": "sensitive-PII",
+        "phi": "sensitive-PHI",
+        "sensitive-phi": "sensitive-PHI",
+        "personal": "sensitive-PII",
+        "health": "sensitive-PHI",
+        "customer records": "customer",
+        "customer-records": "customer",
+        "non-sensitive": "none",
+        "nonsensitive": "none",
+    }
+    return aliases.get(raw.lower(), raw)
+
+def clean_detail(value):
+    raw = str(value or "").strip().lower().replace("_", "-")
+    aliases = {
+        "row": "row-level",
+        "row level": "row-level",
+        "row-level": "row-level",
+        "detail": "row-level",
+        "detailed": "row-level",
+        "aggregate": "aggregate",
+        "aggregated": "aggregate",
+        "summary": "aggregate",
+    }
+    return aliases.get(raw, raw)
+
+def signed(value):
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, dict):
+        return bool(str(value.get("signedBy") or value.get("operator") or "").strip())
+    return False
+
 if kind == "spec":
     out = dict(data)
     out["kind"] = "spec"
@@ -91,7 +132,7 @@ elif kind == "validation":
     if not out.get("reconciliation"):
         fail("validation receipt needs reconciliation details")
     suffix = "validation-receipt"
-else:
+elif kind == "adversarial-review":
     out = dict(data)
     out["kind"] = "adversarial-review"
     scores = out.get("scores")
@@ -102,6 +143,28 @@ else:
         if not isinstance(scores.get(key), (int, float)):
             fail(f"adversarial-review score '{key}' must be a number")
     suffix = "adversarial-review-receipt"
+else:
+    out = dict(data)
+    out["kind"] = "data-safety"
+    classification = clean_class(out.get("dataClassification") or out.get("classification"))
+    allowed = {"none", "internal", "sensitive-PII", "sensitive-PHI", "payroll", "customer"}
+    if classification not in allowed:
+        fail("data-safety receipt needs dataClassification: none, internal, sensitive-PII, sensitive-PHI, payroll, or customer")
+    out["dataClassification"] = classification
+    require_text(out, "deliveryAudience")
+    if not isinstance(out.get("dataLeavesCompany"), bool):
+        fail("data-safety receipt needs dataLeavesCompany true or false")
+    if out["dataLeavesCompany"] is True:
+        require_text(out, "exportDestination")
+    elif not isinstance(out.get("exportDestination"), str):
+        out["exportDestination"] = "none"
+    detail = clean_detail(out.get("detailLevel") or out.get("sharingLevel"))
+    if detail not in {"row-level", "aggregate"}:
+        fail("data-safety receipt needs detailLevel row-level or aggregate")
+    out["detailLevel"] = detail
+    if not signed(out.get("operatorSignoff")):
+        fail("data-safety receipt needs operatorSignoff")
+    suffix = "data-safety-receipt"
 
 os.makedirs(receipts_dir, exist_ok=True)
 dest = os.path.join(receipts_dir, f"{analysis_id}-{suffix}.json")
@@ -155,6 +218,42 @@ if (kind === "trivial" && !raw.trimStart().startsWith("{")) {
 
 let out;
 let suffix;
+function cleanClass(value) {
+  const raw = String(value || "").trim();
+  const aliases = {
+    pii: "sensitive-PII",
+    "sensitive-pii": "sensitive-PII",
+    phi: "sensitive-PHI",
+    "sensitive-phi": "sensitive-PHI",
+    personal: "sensitive-PII",
+    health: "sensitive-PHI",
+    "customer records": "customer",
+    "customer-records": "customer",
+    "non-sensitive": "none",
+    nonsensitive: "none",
+  };
+  return aliases[raw.toLowerCase()] || raw;
+}
+function cleanDetail(value) {
+  const raw = String(value || "").trim().toLowerCase().replace(/_/g, "-");
+  const aliases = {
+    row: "row-level",
+    "row level": "row-level",
+    "row-level": "row-level",
+    detail: "row-level",
+    detailed: "row-level",
+    aggregate: "aggregate",
+    aggregated: "aggregate",
+    summary: "aggregate",
+  };
+  return aliases[raw] || raw;
+}
+function signed(value) {
+  if (typeof value === "string") return Boolean(value.trim());
+  if (value && typeof value === "object" && !Array.isArray(value)) return Boolean(String(value.signedBy || value.operator || "").trim());
+  return false;
+}
+
 if (kind === "spec") {
   out = { ...data, kind: "spec" };
   if (!out.question || !out.metricDefinitions || !out.validAnswer) {
@@ -172,7 +271,7 @@ if (kind === "spec") {
   if (typeof out.reconciled !== "boolean") fail("validation receipt needs reconciled true or false");
   if (!out.reconciliation) fail("validation receipt needs reconciliation details");
   suffix = "validation-receipt";
-} else {
+} else if (kind === "adversarial-review") {
   out = { ...data, kind: "adversarial-review" };
   const scores = out.scores;
   if (!scores || typeof scores !== "object" || Array.isArray(scores)) fail("adversarial-review receipt needs scores");
@@ -180,6 +279,22 @@ if (kind === "spec") {
     if (typeof scores[key] !== "number") fail(`adversarial-review score '${key}' must be a number`);
   }
   suffix = "adversarial-review-receipt";
+} else {
+  out = { ...data, kind: "data-safety" };
+  const classification = cleanClass(out.dataClassification || out.classification);
+  if (!["none", "internal", "sensitive-PII", "sensitive-PHI", "payroll", "customer"].includes(classification)) {
+    fail("data-safety receipt needs dataClassification: none, internal, sensitive-PII, sensitive-PHI, payroll, or customer");
+  }
+  out.dataClassification = classification;
+  if (typeof out.deliveryAudience !== "string" || !out.deliveryAudience.trim()) fail("data-safety receipt needs deliveryAudience");
+  if (typeof out.dataLeavesCompany !== "boolean") fail("data-safety receipt needs dataLeavesCompany true or false");
+  if (out.dataLeavesCompany === true && (typeof out.exportDestination !== "string" || !out.exportDestination.trim())) fail("data-safety receipt needs exportDestination");
+  if (out.dataLeavesCompany === false && typeof out.exportDestination !== "string") out.exportDestination = "none";
+  const detail = cleanDetail(out.detailLevel || out.sharingLevel);
+  if (!["row-level", "aggregate"].includes(detail)) fail("data-safety receipt needs detailLevel row-level or aggregate");
+  out.detailLevel = detail;
+  if (!signed(out.operatorSignoff)) fail("data-safety receipt needs operatorSignoff");
+  suffix = "data-safety-receipt";
 }
 
 fs.mkdirSync(receiptsDir, { recursive: true });
