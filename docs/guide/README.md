@@ -2,6 +2,8 @@
 
 This guide is for a BI/reporting person who is good with data and new to Claude Code (an AI assistant you run in a folder).
 
+**Printable handout:** [bi-toolkit-user-guide.pdf](bi-toolkit-user-guide.pdf) is a single PDF of this whole guide (cover + table of contents), good for printing or sharing. It is generated from these pages; to refresh it after editing the guide, combine the pages in order and run the `make-pdf` tool.
+
 Read in order:
 
 1. [Welcome](00-welcome.md)
