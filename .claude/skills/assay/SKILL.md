@@ -39,6 +39,8 @@ Project-specific rules live in `assay.config.jsonc`. Receipts live in
 the configured receipts directory, defaulting to `.assay/receipts/`. A receipt
 is a saved proof file for a completed stage. Always write receipts with
 `.claude/workflows/receipt.sh`; do not hand-write the files directly.
+Metric definitions live in the configured metric catalog, defaulting to
+`metric-catalog.json`. A metric catalog is the shared metric definition file.
 
 The model must not bypass `.claude/workflows/assay-preflight.sh`. A preflight is
 a required gate check before a chokepoint, meaning a named stopping point in
@@ -57,7 +59,9 @@ Before every subcommand:
 
 1. Read `assay.config.jsonc` if present.
 2. If absent, continue with safe defaults and recommend `/assay intake`.
-3. Do not overwrite the operator's config.
+3. Read the metric catalog from `metricCatalogPath` if present; otherwise use
+   `metric-catalog.json`.
+4. Do not overwrite the operator's config.
 
 ## Subcommands
 
@@ -85,6 +89,7 @@ Interview the operator and fill in:
 
 - BI stack: warehouse, BI tool, query language.
 - Source-of-truth list, meaning the official source for each key metric.
+- Metric catalog entries, meaning shared definitions for key metrics.
 - Validation habit, meaning how numbers are checked.
 - Stakeholders and delivery rules.
 - High-stakes examples, meaning work that drives money, headcount, or strategy.
@@ -95,6 +100,18 @@ Interview the operator and fill in:
   analysis workspace.
 
 Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
+For each key metric the operator names, capture it into the metric catalog with:
+
+```bash
+bash .claude/workflows/metric-store.sh add <metric-name> <definition> <source-of-truth> <owner> <format> [notes]
+```
+
+Definitions must be exact calculation rules. Source-of-truth in
+`assay.config.jsonc` is the older lightweight map used by gates; the metric
+catalog is the richer living record. Keep them aligned, or derive the config map
+from catalog entries during intake. If they disagree, surface the mismatch and
+ask which source should be official.
+
 When drafting `CLAUDE.md`, copy the **Governing rules** section from
 `CLAUDE.starter.md` verbatim, so every future session in this folder routes
 through the loop, validates independently, and delegates mechanical work.
@@ -119,6 +136,28 @@ The active pointer is `.assay/active.json`. It lets a fresh session know which
 analysis to resume first.
 
 ### `/assay spec`
+
+Before writing the Stage 2 spec receipt, read each metric from the catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh get <metric-name>
+```
+
+For every metric definition proposed in the spec, reconcile it against the
+catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh check <metric-name> <proposed-definition>
+```
+
+If the result is `metric-store:match`, use the catalog definition in the spec
+receipt. If the result is `metric-store:not-found`, ask the operator whether to
+add the metric with `metric-store.sh add` before continuing. If the result is
+`metric-store:differs`, flag a methodology fork. A methodology fork is a choice
+that changes numbers. Treat a different definition for a key metric as drift,
+meaning definitions have split across analyses, and escalate loudly for an
+operator ruling. The catalog is advisory and does not block every mismatch, but
+do not hide drift on a decision-driving metric.
 
 Write the Stage 2 spec receipt with the receipt writer by calling:
 

@@ -44,8 +44,9 @@ bash "$KIT/install.sh" "$T" >/dev/null 2>&1
 n=$(find "$T/.claude/skills" -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
 check "installs the /assay router + domain skills (>=31)" "[ \"$n\" -ge 31 ]"
 check "installs the engine workflows" "[ -f \"$T/.claude/workflows/assay-execute.js\" ] && [ -f \"$T/.claude/workflows/assay-validate.js\" ]"
-check "installs the gates + receipt/rulings/report/dashboard writers" "[ -f \"$T/.claude/workflows/config.sh\" ] && [ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -x \"$T/.claude/workflows/report-render.sh\" ] && [ -x \"$T/.claude/workflows/dashboard-render.sh\" ] && [ -x \"$T/.claude/workflows/deliverable-diff.sh\" ] && [ -x \"$T/.claude/workflows/driftcheck.sh\" ] && [ -x \"$T/.claude/workflows/distribution-manifest.sh\" ] && [ -f \"$T/.claude/workflows/rulings.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/datacheck.sh\" ] && [ -f \"$T/.claude/workflows/reprocheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-state.sh\" ] && [ -f \"$T/.claude/workflows/assay-active.sh\" ] && [ -f \"$T/.claude/workflows/assay-help.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
+check "installs the gates + receipt/rulings/report/dashboard writers" "[ -f \"$T/.claude/workflows/config.sh\" ] && [ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -x \"$T/.claude/workflows/metric-store.sh\" ] && [ -x \"$T/.claude/workflows/report-render.sh\" ] && [ -x \"$T/.claude/workflows/dashboard-render.sh\" ] && [ -x \"$T/.claude/workflows/deliverable-diff.sh\" ] && [ -x \"$T/.claude/workflows/driftcheck.sh\" ] && [ -x \"$T/.claude/workflows/distribution-manifest.sh\" ] && [ -f \"$T/.claude/workflows/rulings.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/datacheck.sh\" ] && [ -f \"$T/.claude/workflows/reprocheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-state.sh\" ] && [ -f \"$T/.claude/workflows/assay-active.sh\" ] && [ -f \"$T/.claude/workflows/assay-help.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
 check "installs the data-safety policy doc" "[ -f \"$T/data-safety.md\" ]"
+check "installs the example metric catalog" "[ -f \"$T/metric-catalog.json\" ] && python3 -m json.tool \"$T/metric-catalog.json\" >/dev/null"
 check "installs active lesson loader" "[ -f \"$T/.claude/workflows/lesson-loader.js\" ]"
 check "installs the governing reminder hook script" "[ -x \"$T/.claude/hooks/governing-reminder.sh\" ]"
 memory_bullets="$(grep -c '^- ' "$T/seed-memory/MEMORY.md" 2>/dev/null || echo 0)"
@@ -54,6 +55,12 @@ json_check "merges hook into fresh settings.json" "$T/.claude/settings.json" hoo
 bash "$KIT/install.sh" "$T" >/dev/null 2>&1
 json_check "hook merge is idempotent on rerun" "$T/.claude/settings.json" hook_once
 check "does not ship the dev-kit arc loop" "[ ! -e \"$T/.claude/skills/arc\" ]"
+rm -rf "$T"
+
+T="$(mktemp -d)"
+printf '{\"schemaVersion\":\"metric-catalog/v1\",\"metrics\":{\"custom\":{\"name\":\"custom\",\"definition\":\"keep me\",\"sourceOfTruth\":\"CRM\",\"owner\":\"Ops\",\"format\":\"count\",\"notes\":\"\"}}}\n' > "$T/metric-catalog.json"
+bash "$KIT/install.sh" "$T" >/dev/null 2>&1
+check "does not overwrite existing metric-catalog.json" "grep -q 'keep me' \"$T/metric-catalog.json\""
 rm -rf "$T"
 
 T="$(mktemp -d)"

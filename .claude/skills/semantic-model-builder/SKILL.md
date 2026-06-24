@@ -20,6 +20,7 @@ Build semantic documentation, meaning business-friendly data definitions, so ana
 5. **Grain**: what one row represents.
 6. **Relationships**: how tables connect.
 7. **Source of truth**: trusted source for final numbers.
+8. **Metric catalog entry**: the living metric store record, meaning the shared definition file.
 
 ## Context Gathering
 
@@ -89,6 +90,22 @@ For each metric, document:
 - Rounding.
 - Source of truth.
 
+Before finalizing metric documentation, read the living metric catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh get <metric-name>
+```
+
+If the metric is new or the semantic model approves a clarified definition, ask
+the operator before writing it with:
+
+```bash
+bash .claude/workflows/metric-store.sh add <metric-name> <definition> <source-of-truth> <owner> <format> [notes]
+```
+
+If the semantic model uses a different definition than the catalog, flag drift,
+meaning definitions have split across analyses, as a methodology fork.
+
 Frame choices by consequence: changing a time window changes comparability; excluding refunds changes revenue; counting test users inflates adoption.
 
 ### Step 4: Document Relationships
@@ -112,6 +129,7 @@ Record metric owner, source owner, review cadence, last updated date, and how pr
 - [ ] Grain is stated for every table.
 - [ ] Relationships include keys and risk notes.
 - [ ] Source of truth is named for decision-driving metrics.
+- [ ] Decision-driving metrics are checked against `metric-catalog.json`.
 - [ ] Open questions are separated from confirmed definitions.
 
 ## Output Template
@@ -149,4 +167,3 @@ One row represents: [definition]
 ## Open Questions
 - [question]
 ```
-

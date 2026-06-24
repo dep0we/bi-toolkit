@@ -11,6 +11,12 @@ A metric definition must exist before the query runs. Metric definition means th
 exact rule for calculating a number. Without it, two people can both calculate
 "churn" and produce different answers while both think they are right.
 
+Use `metric-catalog.json` as the living metric store. Living means the shared
+definition is updated as the team learns. During spec, compare proposed metric
+definitions to the catalog with `metric-store.sh check`; if the result differs,
+treat it as drift, meaning definitions have split across analyses, and escalate
+for an operator ruling.
+
 The spec receipt records the question, metric definitions, scope, and valid
 answer. That receipt is what `questioncheck` enforces.
 

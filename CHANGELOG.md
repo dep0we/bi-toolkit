@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Production Bundle 4 living metric store: tracked `metric-catalog.json` now
+  holds shared metric definitions, `.claude/workflows/metric-store.sh` can add,
+  get, list, and compare definitions, `/assay intake` writes key metrics into
+  the catalog, and `/assay spec` flags missing or differing definitions as
+  metric drift before numbers run.
 - Production Bundle 3 recurring-report ops: report and dashboard delivery now
   record per-run metric snapshots, write plain-language deliverable diffs,
   maintain a latest pointer, run drift monitoring for data products, and emit

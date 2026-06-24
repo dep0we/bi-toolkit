@@ -17,6 +17,11 @@
     // "gross_margin": "NetSuite finance report"
   },
 
+  // The metric catalog is the richer living record, meaning shared team metric
+  // knowledge. Keep sourceOfTruth above in sync for older gates, or derive it
+  // from metric-catalog.json during intake.
+  "metricCatalogPath": "metric-catalog.json",
+
   "baseBranch": "main",
 
   // Gate readers and writers use these first, then env vars, then defaults.
