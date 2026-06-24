@@ -20,6 +20,7 @@
   "baseBranch": "main",
 
   "receiptsDir": ".assay/receipts",
+  "rulingsDir": ".assay/rulings",
 
   // Governing docs are rule files the model may not rewrite during analysis.
   // govcheck snapshots these at discovery, then blocks delivery if any changed.

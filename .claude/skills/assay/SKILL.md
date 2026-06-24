@@ -140,6 +140,34 @@ Stage 2 spec receipt, and the config.
 
 Do not compute final results in this stage.
 
+After discovery returns, record the latest discovery run before execute:
+
+```bash
+bash .claude/workflows/rulings.sh discovery <analysis-id> <discoveryRunId> <<'JSON'
+["fork-id-one", "fork-id-two"]
+JSON
+```
+
+Ask the operator to rule every Tier-A fork. Then write the durable rulings file:
+
+```bash
+bash .claude/workflows/rulings.sh write <analysis-id> <discoveryRunId> <<'JSON'
+{
+  "forkIds": ["fork-id-one", "fork-id-two"],
+  "rulings": {
+    "fork-id-one": {
+      "ruling": "approved option",
+      "rationale": "why the operator chose it"
+    },
+    "fork-id-two": "approved option"
+  }
+}
+JSON
+```
+
+This creates `.assay/rulings/<analysis-id>-rulings.json`. A ruling is the
+operator's approved method choice.
+
 ### `/assay execute`
 
 Before running work, call:
@@ -149,7 +177,19 @@ bash .claude/workflows/assay-preflight.sh execute <analysis-id>
 ```
 
 If it fails, stop. Explain that Stage 6 is blocked until the Stage 2 spec receipt
-exists. Do not bypass the gate.
+exists and every surfaced Tier-A methodology fork has a current ruling. A
+methodology fork is a choice that changes numbers. Do not bypass the gate.
+
+If discovery was deliberately rerun and the old rulings still apply, get the
+operator's explicit approval and re-affirm the current rulings:
+
+```bash
+bash .claude/workflows/rulings.sh reaffirm <analysis-id> <<'JSON'
+{
+  "reason": "operator confirmed these rulings still apply after rerun"
+}
+JSON
+```
 
 Then run the analysis or build the data product according to the spec and ruled
 methodology. **Delegate the mechanical work to sub-agents** (they run on a

@@ -44,12 +44,22 @@ bash "$KIT/install.sh" "$T" >/dev/null 2>&1
 n=$(find "$T/.claude/skills" -name SKILL.md 2>/dev/null | wc -l | tr -d ' ')
 check "installs the /assay router + domain skills (>=31)" "[ \"$n\" -ge 31 ]"
 check "installs the engine workflows" "[ -f \"$T/.claude/workflows/assay-execute.js\" ] && [ -f \"$T/.claude/workflows/assay-validate.js\" ]"
-check "installs the gates + receipt writer" "[ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
+check "installs the gates + receipt/rulings writers" "[ -f \"$T/.claude/workflows/questioncheck.sh\" ] && [ -f \"$T/.claude/workflows/receipt.sh\" ] && [ -f \"$T/.claude/workflows/rulings.sh\" ] && [ -f \"$T/.claude/workflows/govcheck.sh\" ] && [ -f \"$T/.claude/workflows/assay-preflight.sh\" ]"
+check "installs active lesson loader" "[ -f \"$T/.claude/workflows/lesson-loader.js\" ]"
 check "installs the governing reminder hook script" "[ -x \"$T/.claude/hooks/governing-reminder.sh\" ]"
+memory_bullets="$(grep -c '^- ' "$T/seed-memory/MEMORY.md" 2>/dev/null || echo 0)"
+check "generates seed-memory/MEMORY.md index" "[ -f \"$T/seed-memory/MEMORY.md\" ] && [ \"$memory_bullets\" -ge 4 ]"
 json_check "merges hook into fresh settings.json" "$T/.claude/settings.json" hook_once
 bash "$KIT/install.sh" "$T" >/dev/null 2>&1
 json_check "hook merge is idempotent on rerun" "$T/.claude/settings.json" hook_once
 check "does not ship the dev-kit arc loop" "[ ! -e \"$T/.claude/skills/arc\" ]"
+rm -rf "$T"
+
+T="$(mktemp -d)"
+mkdir -p "$T/seed-memory"
+printf 'custom index\n' > "$T/seed-memory/MEMORY.md"
+bash "$KIT/install.sh" "$T" >/dev/null 2>&1
+check "does not overwrite existing seed-memory/MEMORY.md" "grep -qx 'custom index' \"$T/seed-memory/MEMORY.md\""
 rm -rf "$T"
 
 T="$(mktemp -d)"

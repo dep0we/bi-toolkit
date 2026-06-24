@@ -32,12 +32,14 @@ if $CHECK; then
     ".claude/hooks/governing-reminder.sh" \
     ".claude/workflows/assay-preflight.sh" \
     ".claude/workflows/receipt.sh" \
+    ".claude/workflows/rulings.sh" \
     ".claude/workflows/govcheck.sh" \
     ".claude/workflows/questioncheck.sh" \
     ".claude/workflows/validationcheck.sh" \
     ".claude/workflows/assay-discovery.js" \
     ".claude/workflows/assay-execute.js" \
     ".claude/workflows/assay-validate.js" \
+    ".claude/workflows/lesson-loader.js" \
     ".claude/workflows/decision-ledger.sh" \
     "assay.config.jsonc"; do
     [ -e "$TARGET/$f" ] || missing+=("$f")
@@ -229,13 +231,13 @@ if [ -d "$KIT/.claude/hooks" ]; then
 fi
 merge_governing_hook
 
-for f in assay-preflight.sh receipt.sh govcheck.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
+for f in assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
 done
 
-for f in assay-discovery.js assay-execute.js assay-validate.js; do
+for f in lesson-loader.js assay-discovery.js assay-execute.js assay-validate.js; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
 done
@@ -266,6 +268,26 @@ else
     dest="$TARGET/seed-memory/$(basename "$f")"
     [ -e "$dest" ] || cp "$f" "$dest"
   done
+  if [ ! -e "$TARGET/seed-memory/MEMORY.md" ]; then
+    {
+      printf '# BI Toolkit Memory Index\n\n'
+      for f in "$TARGET"/seed-memory/*.md; do
+        [ -e "$f" ] || continue
+        [ "$(basename "$f")" = "MEMORY.md" ] && continue
+        title="$(awk '/^# / { sub(/^# /, ""); print; exit }' "$f")"
+        [ -n "$title" ] || title="$(basename "$f" .md)"
+        summary="$(awk 'BEGIN{seen=0} /^#/ {next} /^[[:space:]]*$/ {next} {print; exit}' "$f")"
+        if [ -n "$summary" ]; then
+          printf -- '- [%s](%s): %s\n' "$title" "$(basename "$f")" "$summary"
+        else
+          printf -- '- [%s](%s)\n' "$title" "$(basename "$f")"
+        fi
+      done
+    } > "$TARGET/seed-memory/MEMORY.md"
+    say "  created: seed-memory/MEMORY.md"
+  else
+    say "  left untouched: seed-memory/MEMORY.md"
+  fi
 fi
 say "  seeded: seed-memory/"
 
@@ -282,6 +304,7 @@ add_ignore() {
 }
 
 add_ignore ".assay/receipts/"
+add_ignore ".assay/rulings/"
 add_ignore "*.local"
 add_ignore "*.local.json"
 

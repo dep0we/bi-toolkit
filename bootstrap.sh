@@ -31,6 +31,10 @@ fi
 
 echo "Installing into $TARGET..."
 bash "$KIT_DIR/install.sh" "$TARGET"
+if [ -d "$TARGET/seed-memory" ] && [ ! -f "$TARGET/seed-memory/MEMORY.md" ]; then
+  echo "bootstrap: seed-memory/MEMORY.md was not generated" >&2
+  exit 1
+fi
 
 echo ""
 echo "bi-toolkit is installed."

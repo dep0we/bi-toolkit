@@ -6,6 +6,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Bundle 2 durable methodology rulings: `/assay discovery` now records discovery
+  run ids and surfaced fork ids, `/assay execute` now fails closed when rulings
+  are missing, incomplete, or stale, and operators can explicitly reaffirm
+  rulings after a deliberate discovery rerun.
+- Active BI lessons: installed seed-memory files now get a generated
+  `seed-memory/MEMORY.md` index when missing, and execute/validate workflows load
+  relevant lessons into prep, run, reconcile, score, and review prompts.
+- BI decision ledger: durable decision history now writes to
+  `.assay/rulings/decisions.jsonl` and validates BI decision classes such as
+  metric-definition, source-of-truth, cohort-or-window, null-or-outlier,
+  statistical-method, segment-boundary, and refresh-cadence.
 - Bundle 1 gate enforcement: `/assay` now has a structural preflight dispatcher
   for discovery, execute, and deliver; discovery snapshots protected governing
   docs, execute enforces the spec gate, and deliver enforces validation plus

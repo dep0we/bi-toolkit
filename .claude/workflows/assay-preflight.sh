@@ -28,6 +28,7 @@ case "$CHECKPOINT" in
     ;;
   execute)
     bash "$SCRIPT_DIR/questioncheck.sh" "$ID"
+    bash "$SCRIPT_DIR/rulings.sh" check "$ID"
     ;;
   deliver)
     bash "$SCRIPT_DIR/validationcheck.sh" "$ID"

@@ -1,7 +1,10 @@
+import { lessonBrief, lessonLoaderPrompt } from './lesson-loader.js'
+
 export const meta = {
   name: 'assay-execute',
   description: 'Phase 6 of the assay loop. Runs the analysis to the operator rulings through Sonnet sub-agents, then performs adversarial review in rounds with plain-language and methodology rigor lenses until a clean round. Stops at PR-ready and never delivers.',
   phases: [
+    { title: 'Lessons' },
     { title: 'Prep' },
     { title: 'Run' },
     { title: 'Review' },
@@ -138,6 +141,14 @@ const RUN_SCHEMA = {
   },
 }
 
+phase('Lessons')
+const LESSONS_RAW = await agent(
+  lessonLoaderPrompt({ project: PROJECT, request: REQUEST, phase: 'execute' }),
+  { label: 'load-active-lessons', phase: 'Lessons', model: 'sonnet' },
+)
+const LESSONS = lessonBrief(LESSONS_RAW)
+log(LESSONS ? 'Loaded active BI lessons - injecting into prep/run/review' : 'No active BI lessons found - proceeding without lesson brief')
+
 function crossFamilyReviewerThunk(roundNo) {
   if (!XF_ENABLED) return null
   if (XF_AVAILABLE) {
@@ -168,6 +179,7 @@ STACK: ${JSON.stringify(STACK)}
 SOURCE OF TRUTH: ${JSON.stringify(SOURCE_OF_TRUTH)}
 OPERATOR RULINGS:
 ${RULINGS}
+${LESSONS}
 
 Dimension: ${d.prompt}
 List concrete risks the analysis runner must handle, each with severity and fix. Empty list if none. ${PLAIN_LANGUAGE_RULE}`,
@@ -185,6 +197,7 @@ STACK: ${JSON.stringify(STACK)}
 SOURCE OF TRUTH: ${JSON.stringify(SOURCE_OF_TRUTH)}
 OPERATOR RULINGS (fixed constraints; do not substitute easier choices):
 ${RULINGS}
+${LESSONS}
 PREP FINDINGS:
 ${JSON.stringify(prep, null, 2)}
 
@@ -225,6 +238,7 @@ REQUEST: ${REQUEST}
 SPEC: ${SPEC}
 RUN SUMMARY: ${run?.summary}
 ARTIFACTS: ${(run?.artifacts ?? []).join(', ')}
+${LESSONS}
 
 Lens: ${l.prompt}
 Read the analysis artifacts, query outputs, assumptions, and reconciliation notes. Report real findings only. P0/P1 blocks if it can change the number, confidence, reproducibility, or stakeholder decision. P2 reports non-blocking polish. ${PLAIN_LANGUAGE_RULE}`,
@@ -262,6 +276,7 @@ BLOCKING SHORTCUTS:
 ${JSON.stringify(blockingShortcuts, null, 2)}
 NON-BLOCKING P2s:
 ${JSON.stringify(p2s, null, 2)}
+${LESSONS}
 
 Work as Sonnet query-runner, eda-profiler, and reconciler workers. Re-run affected queries or calculations, update artifacts, and self-check that the fix addresses the failure class. If a fix requires a new Tier-A methodology ruling, stop and return that as the only result. Do not write final delivery copy.
 Return a one-line description of what changed.`,
@@ -291,7 +306,8 @@ const packageCheck = await agent(
   `Prepare the analysis package for PR review only. Confirm the artifacts include: ruled methodology decisions, query or calculation steps, result tables, source-of-truth reconciliation inputs, assumptions, and open risks.
 Do not deliver to stakeholders. Enforce plain-language labels and inline definitions in any operator-facing notes.
 REQUEST: ${REQUEST}
-ARTIFACTS: ${(run?.artifacts ?? []).join(', ')}`,
+ARTIFACTS: ${(run?.artifacts ?? []).join(', ')}
+${LESSONS}`,
   { schema: FINDINGS_SCHEMA, label: 'package-check', phase: 'Package', model: 'sonnet' },
 )
 
