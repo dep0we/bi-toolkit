@@ -22,6 +22,15 @@
   // Gate readers and writers use these first, then env vars, then defaults.
   "receiptsDir": ".assay/receipts",
   "rulingsDir": ".assay/rulings",
+  "deliverablesDir": ".assay/deliverables",
+
+  "report": {
+    "orgName": "Your Organization",
+    "logoPath": "",
+    "accentColor": "#2563eb",
+    "footer": "Confidential - share only with the approved audience.",
+    "outputFormats": ["html", "pdf"]
+  },
 
   // Optional. When set, deliver runs this command before packaging and blocks if
   // it exits non-zero. Use it to re-run the analysis or report build and fail

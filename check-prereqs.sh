@@ -45,6 +45,29 @@ check_optional_cli() {
   fi
 }
 
+check_optional_pdf_renderer() {
+  local found=""
+  for name in pandoc wkhtmltopdf google-chrome google-chrome-stable chromium chromium-browser chrome; do
+    if have "$name"; then
+      found="$name"
+      break
+    fi
+  done
+  if [ -z "$found" ] && [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+    found="Google Chrome"
+  fi
+  if [ -z "$found" ] && [ -x "/Applications/Chromium.app/Contents/MacOS/Chromium" ]; then
+    found="Chromium"
+  fi
+
+  if [ -n "$found" ]; then
+    line "ok       PDF renderer, meaning tool that makes PDF files ($found)"
+  else
+    printf 'optional PDF renderer, meaning tool that makes PDF files\n         -> Install pandoc, wkhtmltopdf, Chrome, or Chromium to also create PDF reports. HTML reports always work without this.\n'
+    warn_missing=$((warn_missing + 1))
+  fi
+}
+
 check_required_json_runner() {
   if have python3 || have node; then
     line "ok       python3 or node"
@@ -83,12 +106,14 @@ check_required_cli curl "Install curl; bootstrap uses it to download the public 
 check_required_json_runner
 check_required_skill_file ".claude/skills/assay/SKILL.md"
 check_required_skill_file ".claude/workflows/receipt.sh"
+check_required_skill_file ".claude/workflows/report-render.sh"
 check_required_skill_file ".claude/workflows/questioncheck.sh"
 check_required_skill_file ".claude/workflows/validationcheck.sh"
 check_required_skill_file ".claude/workflows/assay-discovery.js"
 check_required_skill_file ".claude/workflows/assay-execute.js"
 check_required_skill_file ".claude/workflows/assay-validate.js"
 check_optional_cli codex "Optional cross-family model, meaning a second model family for review."
+check_optional_pdf_renderer
 
 echo "Summary: required missing=${req_missing}, optional missing=${warn_missing}"
 [ "$req_missing" -eq 0 ]

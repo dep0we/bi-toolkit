@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 
 usage() {
-  echo "receipt.sh: usage: receipt.sh <spec|trivial|validation|adversarial-review|data-safety> <analysis-id> [json-file]" >&2
+  echo "receipt.sh: usage: receipt.sh <spec|trivial|validation|adversarial-review|data-safety|deliverable> <analysis-id> [json-file]" >&2
   echo "receipt.sh: pass JSON on stdin when no json-file is given. JSON is a structured data file." >&2
   exit 2
 }
@@ -28,13 +28,14 @@ case "$ID" in
 esac
 
 case "$KIND" in
-  spec|trivial|validation|adversarial-review|data-safety) ;;
+  spec|trivial|validation|adversarial-review|data-safety|deliverable) ;;
   *) usage ;;
 esac
 
 TMP_PAYLOAD=""
 cleanup() {
   [ -n "$TMP_PAYLOAD" ] && rm -f "$TMP_PAYLOAD"
+  return 0
 }
 trap cleanup EXIT
 
@@ -143,7 +144,7 @@ elif kind == "adversarial-review":
         if not isinstance(scores.get(key), (int, float)):
             fail(f"adversarial-review score '{key}' must be a number")
     suffix = "adversarial-review-receipt"
-else:
+elif kind == "data-safety":
     out = dict(data)
     out["kind"] = "data-safety"
     classification = clean_class(out.get("dataClassification") or out.get("classification"))
@@ -165,6 +166,23 @@ else:
     if not signed(out.get("operatorSignoff")):
         fail("data-safety receipt needs operatorSignoff")
     suffix = "data-safety-receipt"
+else:
+    out = dict(data)
+    out["kind"] = "deliverable"
+    if out.get("analysisId") not in (None, analysis_id):
+        fail("deliverable receipt analysisId must match the command analysis-id")
+    out["analysisId"] = analysis_id
+    require_text(out, "timestamp")
+    paths = out.get("paths")
+    if not isinstance(paths, dict):
+        fail("deliverable receipt needs paths")
+    html_path = paths.get("html")
+    if not isinstance(html_path, str) or not html_path.strip():
+        fail("deliverable receipt needs paths.html")
+    pdf_path = paths.get("pdf")
+    if pdf_path is not None and (not isinstance(pdf_path, str) or not pdf_path.strip()):
+        fail("deliverable receipt paths.pdf must be a path when present")
+    suffix = "deliverable-receipt"
 
 os.makedirs(receipts_dir, exist_ok=True)
 dest = os.path.join(receipts_dir, f"{analysis_id}-{suffix}.json")
@@ -279,7 +297,7 @@ if (kind === "spec") {
     if (typeof scores[key] !== "number") fail(`adversarial-review score '${key}' must be a number`);
   }
   suffix = "adversarial-review-receipt";
-} else {
+} else if (kind === "data-safety") {
   out = { ...data, kind: "data-safety" };
   const classification = cleanClass(out.dataClassification || out.classification);
   if (!["none", "internal", "sensitive-PII", "sensitive-PHI", "payroll", "customer"].includes(classification)) {
@@ -295,6 +313,15 @@ if (kind === "spec") {
   out.detailLevel = detail;
   if (!signed(out.operatorSignoff)) fail("data-safety receipt needs operatorSignoff");
   suffix = "data-safety-receipt";
+} else {
+  out = { ...data, kind: "deliverable" };
+  if (out.analysisId !== undefined && out.analysisId !== analysisId) fail("deliverable receipt analysisId must match the command analysis-id");
+  out.analysisId = analysisId;
+  if (typeof out.timestamp !== "string" || !out.timestamp.trim()) fail("deliverable receipt needs timestamp");
+  if (!out.paths || Array.isArray(out.paths) || typeof out.paths !== "object") fail("deliverable receipt needs paths");
+  if (typeof out.paths.html !== "string" || !out.paths.html.trim()) fail("deliverable receipt needs paths.html");
+  if (out.paths.pdf !== undefined && (typeof out.paths.pdf !== "string" || !out.paths.pdf.trim())) fail("deliverable receipt paths.pdf must be a path when present");
+  suffix = "deliverable-receipt";
 }
 
 fs.mkdirSync(receiptsDir, { recursive: true });

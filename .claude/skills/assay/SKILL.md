@@ -335,6 +335,70 @@ Then package the answer with:
 - reconciliation notes;
 - next steps.
 
+Write that package as a deterministic report input JSON file. The renderer
+contract is `schemaVersion: "assay-report/v1"` plus:
+
+```json
+{
+  "schemaVersion": "assay-report/v1",
+  "analysisId": "<analysis-id>",
+  "title": "Plain report title",
+  "audience": "approved audience",
+  "conclusion": "The answer in plain language.",
+  "keyFindings": [
+    {
+      "title": "Finding label",
+      "detail": "What happened.",
+      "evidence": "Validated number and source.",
+      "consequence": "Why the finding matters."
+    }
+  ],
+  "evidence": [
+    {
+      "label": "Metric or check",
+      "detail": "Value, date range, or comparison.",
+      "source": "System, query, or receipt used."
+    }
+  ],
+  "methodology": ["Chosen approach for answering the question."],
+  "caveats": ["Limit that affects trust."],
+  "reconciliationNotes": ["How numbers tied to the official source."],
+  "score": {
+    "confidence": 4,
+    "dataCompleteness": 4,
+    "methodologySoundness": 4,
+    "reproducibility": 4
+  },
+  "nextSteps": ["Owner - action - timing."],
+  "figures": [
+    {
+      "title": "Optional chart title",
+      "description": "What the figure shows.",
+      "imagePath": "optional local image path to embed"
+    }
+  ]
+}
+```
+
+Store the input beside the report when possible, then render:
+
+```bash
+bash .claude/workflows/report-render.sh <analysis-id> <deliverable-json>
+```
+
+The renderer always writes a self-contained HTML report under the configured
+deliverables directory, defaulting to `.assay/deliverables/<analysis-id>/`.
+If `pandoc`, `wkhtmltopdf`, Chrome, or Chromium is available, it also writes a
+PDF (print-ready file for sharing) next to the HTML. If no PDF renderer, meaning
+a tool that makes PDF files, is available, delivery still succeeds and the output
+tells the operator to open the HTML and print-to-PDF. Print-to-PDF means using
+the browser print dialog to save a PDF file.
+
+Report the `assay-report-html`, optional `assay-report-pdf`, and
+`assay-report-receipt` paths from the renderer output. The renderer writes the
+deliverable receipt, meaning saved proof of the delivered report artifact, with
+`receipt.sh` kind `deliverable`; do not hand-write this receipt.
+
 After the answer is successfully delivered, clear the active analysis pointer:
 
 ```bash

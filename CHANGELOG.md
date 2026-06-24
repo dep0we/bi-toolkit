@@ -6,6 +6,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Production Bundle 1 report engine: `/assay deliver` now renders a repeatable,
+  self-contained HTML report from a documented JSON contract, attempts a
+  best-effort PDF when a local renderer is available, and records a deliverable
+  receipt with artifact paths.
 - Bundle 5 conductor + onboarding: `.assay/active.json` now records the active
   analysis and track, `/assay resume` can continue it without an id, the prompt
   hook prints active state or a no-active hint every turn, and `/assay help`
