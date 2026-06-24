@@ -20,6 +20,7 @@ Collect:
 3. **Expected variance**: Variance means gap between compared numbers; define what gap is acceptable.
 4. **Time period**: Date range to reconcile.
 5. **Join keys**: Join key means field used to match records.
+6. **Metric catalog entry**: the approved shared definition.
 
 ## Context Gathering
 
@@ -74,6 +75,17 @@ Choose the comparison level by consequence:
 - **Entity comparison**: Finds account or customer differences.
 - **Transaction comparison**: Best for financial audit, requires matching IDs.
 
+Before comparing values, check that the metric definition being reconciled
+matches the living metric catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh check <metric-name> <definition-being-reconciled>
+```
+
+If it differs, report the definition split before judging the numbers. A value
+can fail reconciliation because the calculation changed, not because the data is
+wrong.
+
 ### Step 4: Join and Compare
 
 Use a full comparison so records present in only one source are visible. Calculate:
@@ -110,6 +122,7 @@ Report whether the metric is safe to use. If not, state exactly what blocks use 
 Before closing:
 - [ ] All sources are available.
 - [ ] Metric definitions are documented.
+- [ ] Metric definitions match the catalog or drift is called out.
 - [ ] Time periods align or the mismatch is explained.
 - [ ] Acceptable variance is defined.
 - [ ] The source-of-truth is named.

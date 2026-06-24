@@ -33,6 +33,12 @@ if $CHECK; then
     ".claude/workflows/config.sh" \
     ".claude/workflows/assay-preflight.sh" \
     ".claude/workflows/receipt.sh" \
+    ".claude/workflows/metric-store.sh" \
+    ".claude/workflows/report-render.sh" \
+    ".claude/workflows/dashboard-render.sh" \
+    ".claude/workflows/deliverable-diff.sh" \
+    ".claude/workflows/driftcheck.sh" \
+    ".claude/workflows/distribution-manifest.sh" \
     ".claude/workflows/rulings.sh" \
     ".claude/workflows/govcheck.sh" \
     ".claude/workflows/questioncheck.sh" \
@@ -48,6 +54,7 @@ if $CHECK; then
     ".claude/workflows/lesson-loader.js" \
     ".claude/workflows/decision-ledger.sh" \
     "assay.config.jsonc" \
+    "metric-catalog.json" \
     "data-safety.md"; do
     [ -e "$TARGET/$f" ] || missing+=("$f")
   done
@@ -238,7 +245,7 @@ if [ -d "$KIT/.claude/hooks" ]; then
 fi
 merge_governing_hook
 
-for f in config.sh assay-preflight.sh receipt.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh assay-active.sh assay-help.sh decision-ledger.sh; do
+for f in config.sh assay-preflight.sh receipt.sh metric-store.sh report-render.sh dashboard-render.sh deliverable-diff.sh driftcheck.sh distribution-manifest.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh assay-active.sh assay-help.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
@@ -260,6 +267,7 @@ if [ -d "$KIT/.claude/agents" ]; then
 fi
 
 copy_if_missing "$KIT/assay.config.example.jsonc" "$TARGET/assay.config.jsonc" "assay.config.jsonc"
+copy_if_missing "$KIT/metric-catalog.json" "$TARGET/metric-catalog.json" "metric-catalog.json"
 copy_if_missing "$KIT/CLAUDE.starter.md" "$TARGET/CLAUDE.md" "CLAUDE.md"
 copy_if_missing "$KIT/PLAYBOOK.md" "$TARGET/PLAYBOOK.md" "PLAYBOOK.md"
 copy_if_missing "$KIT/methodology.md" "$TARGET/methodology.md" "methodology.md"

@@ -17,17 +17,49 @@
     // "gross_margin": "NetSuite finance report"
   },
 
+  // The metric catalog is the richer living record, meaning shared team metric
+  // knowledge. Keep sourceOfTruth above in sync for older gates, or derive it
+  // from metric-catalog.json during intake.
+  "metricCatalogPath": "metric-catalog.json",
+
   "baseBranch": "main",
 
   // Gate readers and writers use these first, then env vars, then defaults.
   "receiptsDir": ".assay/receipts",
   "rulingsDir": ".assay/rulings",
+  "deliverablesDir": ".assay/deliverables",
+
+  "report": {
+    "orgName": "Your Organization",
+    "logoPath": "",
+    "accentColor": "#2563eb",
+    "footer": "Confidential - share only with the approved audience.",
+    "outputFormats": ["html", "pdf"]
+  },
 
   // Optional. When set, deliver runs this command before packaging and blocks if
   // it exits non-zero. Use it to re-run the analysis or report build and fail
   // when outputs changed beyond tolerance. Reproducibility means re-running work
   // gets the same answer.
   "reproCommand": "",
+
+  "monitoring": {
+    // Drift means a metric moved beyond the allowed tolerance. Relative tolerance
+    // compares percentage movement against the prior run.
+    "defaultTolerance": 0.10,
+    "metrics": {
+      // "net_retention": { "tolerance": 0.05, "mode": "relative" },
+      // "open_invoice_count": { "tolerance": 10, "mode": "absolute" }
+    }
+  },
+
+  "distribution": {
+    // This is a local handoff only. Real email, Slack, or BI-tool sending is
+    // deferred to issue #8 because each environment has different channels.
+    "audience": "finance leaders",
+    "channelDescription": "email to finance-leaders",
+    "cadence": "monthly after finance close"
+  },
 
   // Governing docs are rule files the model may not rewrite during analysis.
   // govcheck snapshots these at discovery, then blocks delivery if any changed.

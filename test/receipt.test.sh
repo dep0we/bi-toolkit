@@ -150,6 +150,31 @@ else
 fi
 rm -rf "$T"
 
+T="$(mktemp -d "${TMPDIR:-/tmp}/receipt.XXXXXX")"
+(cd "$T" && bash "$WRITER" deliverable "retention-q2" <<'JSON') >/dev/null
+{
+  "analysisId": "retention-q2",
+  "timestamp": "2026-06-24T00:00:00Z",
+  "paths": {
+    "html": ".assay/deliverables/retention-q2/report-20260624T000000Z.html"
+  },
+  "pdfNote": "No PDF renderer, meaning a tool that makes PDF files, was available."
+}
+JSON
+if [ -f "$T/.assay/receipts/retention-q2-deliverable-receipt.json" ] && python3 - "$T/.assay/receipts/retention-q2-deliverable-receipt.json" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+ok = data.get("kind") == "deliverable" and data.get("paths", {}).get("html")
+raise SystemExit(0 if ok else 1)
+PY
+then
+  pass "writer deliverable receipt is readable"
+else
+  fail "expected written deliverable receipt"
+fi
+rm -rf "$T"
+
 T="$(mktemp -d "${TMPDIR:-/tmp}/receipt-install.XXXXXX")"
 bash "$INSTALL" "$T" >/dev/null
 missing=()
@@ -159,6 +184,8 @@ for f in \
   ".claude/workflows/govcheck.sh" \
   ".claude/workflows/datacheck.sh" \
   ".claude/workflows/receipt.sh" \
+  ".claude/workflows/report-render.sh" \
+  ".claude/workflows/dashboard-render.sh" \
   ".claude/workflows/assay-discovery.js" \
   ".claude/workflows/assay-execute.js" \
   ".claude/workflows/assay-validate.js"; do

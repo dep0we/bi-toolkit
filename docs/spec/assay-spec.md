@@ -61,9 +61,9 @@ tracks; [A] analysis-only; [DP] data-product-only.
 
 | Stage | Name | Track | What runs (domain skills) | Decides |
 |------:|------|-------|---------------------------|---------|
-| 0 | **Intake** (once per project) | [shared] | Guided interview → writes `assay.config` + project `CLAUDE.md`. Captures: data sources + warehouse, BI/viz tool, query language, **source-of-truth for each key metric**, how they validate today, what "done" means for a deliverable, key stakeholders, recurring cadences. (stakeholder-requirements-gathering, schema-mapper, context-packager) | their real process |
+| 0 | **Intake** (once per project) | [shared] | Guided interview → writes `assay.config` + project `CLAUDE.md` and captures key metrics into the living metric catalog. Captures: data sources + warehouse, BI/viz tool, query language, **source-of-truth for each key metric**, how they validate today, what "done" means for a deliverable, key stakeholders, recurring cadences. (stakeholder-requirements-gathering, schema-mapper, context-packager) | their real process |
 | 1 | **Frame** | [shared] | Is the request worth doing, and which track? What decision does the answer drive? (stakeholder-requirements-gathering) | go/no-go + track |
-| 2 | **Spec** | [shared] | Precise question, metric definitions, scope, what a valid answer looks like, success criteria. Writes the **spec receipt** the front gate checks. (analysis-planning, analysis-assumptions-log, business-metrics-calculator for definitions) | scope + definitions |
+| 2 | **Spec** | [shared] | Precise question, metric definitions, scope, what a valid answer looks like, success criteria. Reads metric definitions from the living metric catalog and flags drift, meaning definitions split across analyses, before writing the **spec receipt** the front gate checks. (analysis-planning, analysis-assumptions-log, business-metrics-calculator for definitions) | scope + definitions |
 | 3 | **Plan review** | [shared] | Pressure-test the plan from 3 lenses: decision-value, methodology/stats-rigor, data-availability. (autoplan analog) | which concerns matter |
 | 4 | **Profile data** | [A] | Connect, EDA, schema map. (programmatic-eda, schema-mapper, data-quality-audit) | — |
 | 4d | **Design the product** | [DP] | Layout, which metrics, refresh cadence, access, semantic layer. (dashboard-specification, semantic-model-builder, visualization-builder) | design direction |
@@ -131,10 +131,39 @@ behavior. `install.sh` keeps the dev-kit's copy + gitignore approach.
 Adapt `arc.config.example.jsonc`. Keep `tripwires`, `reviewLenses` (include a
 `plain-language` lens and a `methodology` lens), `crossFamily`, `prepDimensions`.
 Add BI-specific fields: `sourceOfTruth` (map of metric → authoritative source),
-`stack` (warehouse, BI tool, query language), `scoreThresholds`, and
+`metricCatalogPath` (path to the living metric catalog), `stack` (warehouse, BI tool, query language), `scoreThresholds`, and
 `highStakesDefinition`. Replace code tripwires with methodology tripwires (metric
 definitions, segment boundaries, statistical-method choice, data-source switch,
 anything that changes a number stakeholders act on).
+
+## Living metric store
+
+The kit ships a tracked `metric-catalog.json` at the project root. Tracked means
+committed to version control, because metric definitions are shared team
+knowledge. The catalog schema is `metric-catalog/v1`:
+
+- `metrics.<metric>.name`: human metric name.
+- `metrics.<metric>.definition`: exact calculation rule.
+- `metrics.<metric>.sourceOfTruth`: official system or report.
+- `metrics.<metric>.owner`: person or team approving changes.
+- `metrics.<metric>.format`: unit or display format.
+- `metrics.<metric>.notes`: caveats, links, or approval notes.
+
+`.claude/workflows/metric-store.sh` manages the catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh add <name> <definition> <sourceOfTruth> <owner> <format> [notes]
+bash .claude/workflows/metric-store.sh get <name>
+bash .claude/workflows/metric-store.sh list
+bash .claude/workflows/metric-store.sh check <name> <definition>
+```
+
+`metricCatalogPath` in config wins first, then `ASSAY_METRIC_CATALOG`, then the
+default `metric-catalog.json`. The catalog is the richer living record.
+`sourceOfTruth` in config remains a compatibility map for existing gates and can
+be derived from the catalog during intake. If they disagree, escalate the
+source-of-truth mismatch as a methodology fork, meaning a choice that changes
+numbers.
 
 ## File manifest (build all of these)
 
@@ -152,7 +181,8 @@ here — adjust `.gitignore` so the kit's own engine files are tracked):
 execute|validate|deliver|status|finish`), `.claude/workflows/assay-discovery.js`,
 `.claude/workflows/assay-execute.js`, `.claude/workflows/assay-validate.js`,
 `.claude/workflows/questioncheck.sh`, `.claude/workflows/validationcheck.sh`,
-`.claude/workflows/decision-ledger.sh` (reuse).
+`.claude/workflows/metric-store.sh`, `.claude/workflows/decision-ledger.sh`
+(reuse).
 
 Sub-agent defs under `.claude/agents/` (Sonnet workers): `query-runner`,
 `eda-profiler`, `reconciler`, `red-teamer`. Match the Agent-tool agent-definition

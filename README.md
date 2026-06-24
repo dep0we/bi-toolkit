@@ -49,7 +49,8 @@ For a local checkout of this kit, you can also run:
 ```
 
 The installer is rerunnable. It overwrites kit tooling, but it does not overwrite
-an operator's existing `assay.config.jsonc`, `CLAUDE.md`, or docs.
+an operator's existing `assay.config.jsonc`, `metric-catalog.json`, `CLAUDE.md`,
+or docs.
 
 ## 3. How it works
 
@@ -62,9 +63,9 @@ The assay loop has one spine and two tracks. Stage 1 routes the request:
 
 The shared spine:
 
-1. **Intake** - capture the BI stack, data sources, source-of-truth list, validation habit, stakeholders, and done criteria.
+1. **Intake** - capture the BI stack, data sources, source-of-truth list, living metric catalog, validation habit, stakeholders, and done criteria.
 2. **Frame** - decide whether this is ANALYSIS or DATA PRODUCT, and what decision the answer supports.
-3. **Spec** - define the question, metric definitions (exact calculation rules), scope, and valid answer.
+3. **Spec** - define the question, metric definitions (exact calculation rules), scope, and valid answer, then reconcile them to the catalog.
 4. **Discovery** - find methodology forks (choices that change the method) before results are computed.
 5. **Execute** - run the analysis or build the report using the ruled method.
 6. **Validate** - reconcile results to source-of-truth, meaning numbers match or differences are explained.
@@ -119,6 +120,13 @@ The review score has four dimensions:
 The default threshold is 3 out of 5 on every dimension. A lower score blocks
 delivery unless the operator records an acceptance reason.
 
+The living metric store is `metric-catalog.json` by default. It is tracked team
+knowledge, meaning it should be committed with the project. Each metric records
+`name`, `definition`, `sourceOfTruth`, `owner`, `format`, and `notes`.
+`metric-store.sh check <name> <definition>` reports `match`, `differs`, or
+`not-found`; `/assay spec` uses that result to catch drift before numbers run.
+Drift means definitions have split across analyses.
+
 ## 4. The governing rules
 
 These rules are non-negotiable and are enforced through the installed project
@@ -139,9 +147,9 @@ that choice before computing results.
 | Command | What it does |
 | --- | --- |
 | `/assay help` | Explains the kit in plain language and shows the next required step. |
-| `/assay intake` | Captures the BI stack, source-of-truth list, validation habits, stakeholders, and delivery rules. |
+| `/assay intake` | Captures the BI stack, source-of-truth list, metric catalog, validation habits, stakeholders, and delivery rules. |
 | `/assay frame` | Chooses ANALYSIS or DATA PRODUCT and names the decision the work supports. |
-| `/assay spec` | Writes the spec receipt with the question, metrics, scope, and valid answer. |
+| `/assay spec` | Writes the spec receipt after checking metric definitions against the catalog. |
 | `/assay discovery` | Finds methodology forks before results are computed. |
 | `/assay execute` | Runs the ruled analysis or builds the ruled report after `questioncheck` passes. |
 | `/assay validate` | Reconciles results to source-of-truth and writes validation evidence. |

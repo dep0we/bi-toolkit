@@ -39,6 +39,8 @@ Project-specific rules live in `assay.config.jsonc`. Receipts live in
 the configured receipts directory, defaulting to `.assay/receipts/`. A receipt
 is a saved proof file for a completed stage. Always write receipts with
 `.claude/workflows/receipt.sh`; do not hand-write the files directly.
+Metric definitions live in the configured metric catalog, defaulting to
+`metric-catalog.json`. A metric catalog is the shared metric definition file.
 
 The model must not bypass `.claude/workflows/assay-preflight.sh`. A preflight is
 a required gate check before a chokepoint, meaning a named stopping point in
@@ -57,7 +59,9 @@ Before every subcommand:
 
 1. Read `assay.config.jsonc` if present.
 2. If absent, continue with safe defaults and recommend `/assay intake`.
-3. Do not overwrite the operator's config.
+3. Read the metric catalog from `metricCatalogPath` if present; otherwise use
+   `metric-catalog.json`.
+4. Do not overwrite the operator's config.
 
 ## Subcommands
 
@@ -85,6 +89,7 @@ Interview the operator and fill in:
 
 - BI stack: warehouse, BI tool, query language.
 - Source-of-truth list, meaning the official source for each key metric.
+- Metric catalog entries, meaning shared definitions for key metrics.
 - Validation habit, meaning how numbers are checked.
 - Stakeholders and delivery rules.
 - High-stakes examples, meaning work that drives money, headcount, or strategy.
@@ -95,6 +100,18 @@ Interview the operator and fill in:
   analysis workspace.
 
 Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
+For each key metric the operator names, capture it into the metric catalog with:
+
+```bash
+bash .claude/workflows/metric-store.sh add <metric-name> <definition> <source-of-truth> <owner> <format> [notes]
+```
+
+Definitions must be exact calculation rules. Source-of-truth in
+`assay.config.jsonc` is the older lightweight map used by gates; the metric
+catalog is the richer living record. Keep them aligned, or derive the config map
+from catalog entries during intake. If they disagree, surface the mismatch and
+ask which source should be official.
+
 When drafting `CLAUDE.md`, copy the **Governing rules** section from
 `CLAUDE.starter.md` verbatim, so every future session in this folder routes
 through the loop, validates independently, and delegates mechanical work.
@@ -119,6 +136,28 @@ The active pointer is `.assay/active.json`. It lets a fresh session know which
 analysis to resume first.
 
 ### `/assay spec`
+
+Before writing the Stage 2 spec receipt, read each metric from the catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh get <metric-name>
+```
+
+For every metric definition proposed in the spec, reconcile it against the
+catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh check <metric-name> <proposed-definition>
+```
+
+If the result is `metric-store:match`, use the catalog definition in the spec
+receipt. If the result is `metric-store:not-found`, ask the operator whether to
+add the metric with `metric-store.sh add` before continuing. If the result is
+`metric-store:differs`, flag a methodology fork. A methodology fork is a choice
+that changes numbers. Treat a different definition for a key metric as drift,
+meaning definitions have split across analyses, and escalate loudly for an
+operator ruling. The catalog is advisory and does not block every mismatch, but
+do not hide drift on a decision-driving metric.
 
 Write the Stage 2 spec receipt with the receipt writer by calling:
 
@@ -335,6 +374,167 @@ Then package the answer with:
 - reconciliation notes;
 - next steps.
 
+Write that package as a deterministic report input JSON file. The renderer
+contract is `schemaVersion: "assay-report/v1"` plus:
+
+```json
+{
+  "schemaVersion": "assay-report/v1",
+  "analysisId": "<analysis-id>",
+  "title": "Plain report title",
+  "audience": "approved audience",
+  "conclusion": "The answer in plain language.",
+  "keyFindings": [
+    {
+      "title": "Finding label",
+      "detail": "What happened.",
+      "evidence": "Validated number and source.",
+      "consequence": "Why the finding matters."
+    }
+  ],
+  "evidence": [
+    {
+      "label": "Metric or check",
+      "detail": "Value, date range, or comparison.",
+      "source": "System, query, or receipt used."
+    }
+  ],
+  "methodology": ["Chosen approach for answering the question."],
+  "caveats": ["Limit that affects trust."],
+  "reconciliationNotes": ["How numbers tied to the official source."],
+  "score": {
+    "confidence": 4,
+    "dataCompleteness": 4,
+    "methodologySoundness": 4,
+    "reproducibility": 4
+  },
+  "nextSteps": ["Owner - action - timing."],
+  "figures": [
+    {
+      "title": "Optional chart title",
+      "description": "What the figure shows.",
+      "imagePath": "optional local image path to embed"
+    }
+  ]
+}
+```
+
+Store the input beside the report when possible, then render:
+
+```bash
+bash .claude/workflows/report-render.sh <analysis-id> <deliverable-json>
+```
+
+The renderer always writes a self-contained HTML report under the configured
+deliverables directory, defaulting to `.assay/deliverables/<analysis-id>/`.
+If `pandoc`, `wkhtmltopdf`, Chrome, or Chromium is available, it also writes a
+PDF (print-ready file for sharing) next to the HTML. If no PDF renderer, meaning
+a tool that makes PDF files, is available, delivery still succeeds and the output
+tells the operator to open the HTML and print-to-PDF. Print-to-PDF means using
+the browser print dialog to save a PDF file.
+
+Report the `assay-report-html`, optional `assay-report-pdf`, and
+`assay-report-receipt` paths from the renderer output. The renderer writes the
+deliverable receipt, meaning saved proof of the delivered report artifact, with
+`receipt.sh` kind `deliverable`; do not hand-write this receipt.
+The renderer also writes a metrics snapshot (saved key numbers from one run),
+runs driftcheck (metric movement beyond tolerance), writes a deliverable diff
+(what changed since the prior run), and emits a local distribution manifest
+(ready-to-send handoff file) when data-safety rules allow it.
+
+For a data-product track, meaning a recurring report or dashboard, and when the
+approved spec asks for a universal dashboard, write a deterministic dashboard
+input JSON file after the deliver preflight passes. The dashboard contract is
+`schemaVersion: "assay-dashboard/v1"` plus:
+
+```json
+{
+  "schemaVersion": "assay-dashboard/v1",
+  "analysisId": "<analysis-id>",
+  "title": "Plain dashboard title",
+  "audience": "approved audience",
+  "refreshNote": "Refresh cadence and latest data timing.",
+  "panels": [
+    {
+      "type": "kpi",
+      "title": "Headline metric",
+      "data": {
+        "label": "Revenue",
+        "value": 125000,
+        "delta": "+8% versus last period",
+        "note": "Tied to the finance source."
+      }
+    },
+    {
+      "type": "bar",
+      "title": "Revenue by segment",
+      "data": {
+        "labels": ["Enterprise", "Mid-market"],
+        "values": [90000, 35000],
+        "source": "Finance source"
+      }
+    },
+    {
+      "type": "line",
+      "title": "Revenue trend",
+      "data": {
+        "points": [
+          { "x": "2026-04", "y": 112000 },
+          { "x": "2026-05", "y": 119000 }
+        ],
+        "source": "Finance source"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Follow-up rows",
+      "data": {
+        "columns": ["Owner", "Metric", "Status"],
+        "rows": [["Finance", "Revenue", "Reviewed"]]
+      }
+    }
+  ]
+}
+```
+
+Panel types are `kpi` for KPI (main number watched for decisions), `bar` for
+group comparison, `line` for time series (values tracked over time), and `table`
+for detail rows. Then render:
+
+```bash
+bash .claude/workflows/dashboard-render.sh <analysis-id> <dashboard-json>
+```
+
+The renderer writes a self-contained HTML dashboard, meaning a browser page
+saved as a file, under the configured deliverables directory, defaulting to
+`.assay/deliverables/<analysis-id>/`.
+Self-contained means no external network or CDN (hosted shared script source).
+Charts are inline SVG (browser-drawn chart image format), so they render
+offline without JavaScript (browser code that adds behavior) chart libraries.
+The renderer writes the deliverable receipt with `artifactType: "dashboard"`
+using `receipt.sh` kind `deliverable`; do not hand-write this receipt. Report
+the `assay-dashboard-html` and `assay-dashboard-receipt` paths from the renderer
+output.
+
+For a data-product track, meaning a recurring report or dashboard, delivery runs:
+
+```bash
+bash .claude/workflows/driftcheck.sh <analysis-id> <metrics-snapshot-json>
+bash .claude/workflows/deliverable-diff.sh <analysis-id> <metrics-snapshot-json> <artifact-path>
+bash .claude/workflows/distribution-manifest.sh <analysis-id> <artifact-path> <timestamp> <metrics-snapshot-json>
+```
+
+Driftcheck is a warning surface when metrics move beyond tolerance (allowed
+movement before review). It blocks only when the refresh is broken or empty for
+a data product. Broken refresh means the recurring data did not update; empty
+refresh means it returned no rows. Distribution manifests are local handoffs
+only; actual email, Slack, or BI-tool sends are deferred to issue #8. Do not
+emit a distribution manifest for sensitive data unless the data-safety receipt
+has operator sign-off.
+
+Tool-specific exports for Power BI / Tableau / Looker / Metabase are future
+work driven by intake. This engine produces the universal static-HTML view.
+
 After the answer is successfully delivered, clear the active analysis pointer:
 
 ```bash
@@ -365,6 +565,8 @@ and rulings directories and reports:
 - which stage receipts exist;
 - which gate would block next;
 - open findings, meaning missing proof or failed scores;
+- last run, meaning the latest delivered artifact path;
+- drift flags, meaning metric movement beyond tolerance;
 - the single next required step.
 
 When no analysis id is provided, list all in-flight analyses found under

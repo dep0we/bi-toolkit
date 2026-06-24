@@ -17,6 +17,8 @@ The spine is the shared lifecycle and enforcement layer:
   payloads for the back gate.
 - `.claude/workflows/receipt.sh` writes receipt files in the exact format the
   gates read.
+- `.claude/workflows/metric-store.sh` reads and updates the living metric
+  catalog. Living means the shared definition is updated as the team learns.
 - `.claude/workflows/assay-state.sh` reads receipts and rulings to summarize
   status, meaning saved progress and next required step.
 - `.claude/workflows/questioncheck.sh` blocks Stage 6 without a spec receipt.
@@ -35,9 +37,14 @@ The spine is the shared lifecycle and enforcement layer:
 
 `assay.config.example.jsonc` becomes `assay.config.jsonc` in an installed
 project. It captures stack, source-of-truth, `receiptsDir`, `rulingsDir`,
-`reproCommand`, tripwires, review lenses, thresholds, meaning minimum passing
-scores, and high-stakes rules. Source-of-truth means the official place to
-compare against.
+`metricCatalogPath`, `reproCommand`, tripwires, review lenses, thresholds,
+meaning minimum passing scores, and high-stakes rules. Source-of-truth means the
+official place to compare against.
+
+`metric-catalog.json` is tracked project knowledge, not runtime state. It is the
+richer living record for metric name, definition, source-of-truth, owner, format,
+and notes. The older `sourceOfTruth` config map remains for gate compatibility
+and should be derived from or kept aligned with the catalog.
 
 Runtime receipts default to `.assay/receipts/` and are gitignored. A receipt is
 a saved proof file for a completed stage.
@@ -47,7 +54,7 @@ a saved proof file for a completed stage.
 `bootstrap.sh` is the public `curl | bash` entry point. It downloads the public
 repo with `curl` and `tar`, then runs `install.sh` into the current folder.
 `install.sh` is rerunnable: it overwrites kit tooling but does not overwrite
-operator config or docs.
+operator config, metric catalog, or docs.
 
 ## Domain Skills
 

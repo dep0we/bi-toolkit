@@ -21,6 +21,7 @@ Before calculating metrics, collect:
 4. **Time period**: single period, rolling period, or time series.
 5. **Segmentation**: customer type, plan, channel, region, or product.
 6. **Source of truth**: trusted report or system for reconciliation.
+7. **Metric catalog**: shared metric definition file.
 
 ## Context Gathering
 
@@ -87,6 +88,16 @@ Choose definitions and document consequences:
 - LTV: expected lifetime value; depends heavily on churn assumptions.
 - CAC: cost to acquire customer; scope changes comparability.
 
+Before accepting a definition, check the living metric catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh check <metric-name> <proposed-definition>
+```
+
+Use `match` definitions directly. For `not-found`, ask the operator whether to
+add the metric. For `differs`, flag drift, meaning definitions have split across
+analyses, and treat it as a methodology fork before calculating.
+
 ### Step 3: Calculate Core Metrics
 
 For SaaS/subscription, calculate:
@@ -116,11 +127,17 @@ Use benchmarks (outside comparison points) only as context. State whether the be
 ### Step 7: Reconcile and Explain
 
 Tie key totals to source of truth. Explain any variance by amount and percentage. If the metric cannot reconcile within tolerance, mark it as not ready for delivery.
+When the operator approves a new or updated metric, write it to the catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh add <metric-name> <definition> <source-of-truth> <owner> <format> [notes]
+```
 
 ## Context Validation
 
 - [ ] Required data fields are present.
 - [ ] Metric definitions are approved or marked as proposed.
+- [ ] Approved definitions are checked against or written to `metric-catalog.json`.
 - [ ] Time period matches the decision.
 - [ ] Segments are actionable and large enough.
 - [ ] Source-of-truth reconciliation is possible.
@@ -184,4 +201,3 @@ Source of truth: [system/report]
 - Unit economics: calculate LTV, CAC, payback, and acquisition efficiency.
 - Segment metrics: compare actionable customer groups and avoid overreading small samples.
 - Track over time: build monthly history and identify inflection points.
-

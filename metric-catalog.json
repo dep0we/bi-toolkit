@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "metric-catalog/v1",
+  "schema": {
+    "description": "Living metric catalog. Living means the shared definition is updated as the team learns.",
+    "metrics": {
+      "<metric_name>": {
+        "name": "Human-readable metric name.",
+        "definition": "Exact calculation rule, including numerator, denominator, filters, time window, and edge cases.",
+        "sourceOfTruth": "Official system, report, or table used to verify this metric.",
+        "owner": "Person or team accountable for approving definition changes.",
+        "format": "Unit or display format, such as USD, percent, count, days, or ratio.",
+        "notes": "Optional context, caveats, approval notes, or related dashboard links.",
+        "createdAt": "ISO-8601 timestamp written when the metric is first added.",
+        "updatedAt": "ISO-8601 timestamp written when the metric is last changed."
+      }
+    }
+  },
+  "metrics": {}
+}

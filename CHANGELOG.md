@@ -6,6 +6,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Production Bundle 4 living metric store: tracked `metric-catalog.json` now
+  holds shared metric definitions, `.claude/workflows/metric-store.sh` can add,
+  get, list, and compare definitions, `/assay intake` writes key metrics into
+  the catalog, and `/assay spec` flags missing or differing definitions as
+  metric drift before numbers run.
+- Production Bundle 3 recurring-report ops: report and dashboard delivery now
+  record per-run metric snapshots, write plain-language deliverable diffs,
+  maintain a latest pointer, run drift monitoring for data products, and emit
+  local distribution manifests with audience, cadence, channel, classification,
+  and issue #8 send deferral.
+- Production Bundle 2 dashboard engine: `/assay deliver` can now render a
+  self-contained static HTML dashboard from the documented
+  `assay-dashboard/v1` JSON contract, using inline SVG charts for KPI, bar,
+  line, and table panels, applying report branding, and recording a
+  dashboard-typed deliverable receipt.
+- Production Bundle 1 report engine: `/assay deliver` now renders a repeatable,
+  self-contained HTML report from a documented JSON contract, attempts a
+  best-effort PDF when a local renderer is available, and records a deliverable
+  receipt with artifact paths.
 - Bundle 5 conductor + onboarding: `.assay/active.json` now records the active
   analysis and track, `/assay resume` can continue it without an id, the prompt
   hook prints active state or a no-active hint every turn, and `/assay help`
@@ -48,6 +67,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
   BI memory lessons.
 
 ### Changed
+- Standardized production-layer config keys: report footers use
+  `report.footer`, drift tolerances use `monitoring.metrics`, distribution
+  handoffs use `distribution.channelDescription`, and report/dashboard
+  `report.logoPath` resolves from the project working directory.
 - Delivery preflight now runs validationcheck, govcheck, datacheck, then
   reprocheck, so cheap blocking checks run before the reproducibility command.
 - Score thresholds now support per-dimension overrides with
