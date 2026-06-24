@@ -67,6 +67,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
   BI memory lessons.
 
 ### Changed
+- Standardized production-layer config keys: report footers use
+  `report.footer`, drift tolerances use `monitoring.metrics`, distribution
+  handoffs use `distribution.channelDescription`, and report/dashboard
+  `report.logoPath` resolves from the project working directory.
 - Delivery preflight now runs validationcheck, govcheck, datacheck, then
   reprocheck, so cheap blocking checks run before the reproducibility command.
 - Score thresholds now support per-dimension overrides with

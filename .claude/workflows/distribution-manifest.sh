@@ -178,7 +178,7 @@ audience = (
     or spec.get("audience")
     or "audience not configured"
 )
-channel = distribution.get("channelDescription") or distribution.get("channel") or "channel not configured"
+channel = distribution.get("channelDescription") or "channel not configured"
 cadence = distribution.get("cadence") or spec.get("cadence") or snapshot.get("cadence") or "cadence not configured"
 
 manifest = {

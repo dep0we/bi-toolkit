@@ -137,10 +137,9 @@ Brand settings live in `assay.config.jsonc`:
 What each field does:
 
 - `orgName`: name shown in the report header.
-- `logoPath`: local logo image path, if any.
+- `logoPath`: local logo image path from the project folder, if any.
 - `accentColor`: six-digit hex color, such as `#2563eb`.
 - `footer`: confidentiality or sharing note.
 - `outputFormats`: requested formats for reports.
 
 Tool-specific exports for Power BI, Tableau, Looker, or Metabase are future work in the current repo. The verified engine today produces universal static HTML.
-

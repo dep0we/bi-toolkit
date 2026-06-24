@@ -88,6 +88,57 @@ run_render() {
   rm -f "$errf"
 }
 
+write_logo_base_sample() {
+  local dir="$1"
+  mkdir -p "$dir/assets" "$dir/config" "$dir/input"
+  python3 - "$dir/assets/logo.png" <<'PY'
+import base64
+import sys
+png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+open(sys.argv[1], "wb").write(base64.b64decode(png))
+PY
+  cat > "$dir/config/assay.config.jsonc" <<'JSON'
+{
+  "receiptsDir": "proof",
+  "deliverablesDir": "dashboards",
+  "report": {
+    "orgName": "Example Finance",
+    "logoPath": "assets/logo.png",
+    "accentColor": "#0f766e",
+    "footer": "Internal finance use only."
+  }
+}
+JSON
+  cat > "$dir/input/dashboard.json" <<'JSON'
+{
+  "schemaVersion": "assay-dashboard/v1",
+  "analysisId": "retention-q2",
+  "title": "Q2 Retention Dashboard",
+  "audience": "finance leadership",
+  "refreshNote": "Monthly after finance close.",
+  "panels": [
+    {
+      "type": "kpi",
+      "title": "Net retention",
+      "data": {
+        "label": "Net retention",
+        "value": "108%"
+      }
+    }
+  ]
+}
+JSON
+}
+
+run_render_with_paths() {
+  local dir="$1" errf
+  errf="$(mktemp "${TMPDIR:-/tmp}/dashboard-render.err.XXXXXX")"
+  OUT="$(cd "$dir" && bash "$SCRIPT" retention-q2 input/dashboard.json config/assay.config.jsonc 2>"$errf")"
+  RC=$?
+  ERR="$(cat "$errf")"
+  rm -f "$errf"
+}
+
 echo "dashboard-render tests"
 echo "======================"
 
@@ -112,6 +163,17 @@ if [ "$RC" -eq 0 ] && grep -q 'Example Finance' "$T/$HTML" && grep -q -- '--acce
 else
   fail "expected branding in dashboard HTML (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
+
+T2="$(mktemp -d "${TMPDIR:-/tmp}/dashboard-render-logo.XXXXXX")"
+write_logo_base_sample "$T2"
+run_render_with_paths "$T2"
+HTML2="$(printf '%s\n' "$OUT" | sed -n 's/^assay-dashboard-html://p')"
+if [ "$RC" -eq 0 ] && [ -f "$T2/$HTML2" ] && grep -q 'data:image/png;base64' "$T2/$HTML2"; then
+  pass "dashboard logoPath resolves relative to project working directory"
+else
+  fail "expected dashboard logo from project working directory (rc=$RC stdout=$OUT stderr=$ERR html=$HTML2)"
+fi
+rm -rf "$T2"
 
 if [ "$RC" -eq 0 ] && grep -q 'universal static HTML view' "$T/$HTML" && grep -q 'Power BI / Tableau / Looker / Metabase' "$T/$HTML"; then
   pass "dashboard states universal static HTML scope and future tool exports"

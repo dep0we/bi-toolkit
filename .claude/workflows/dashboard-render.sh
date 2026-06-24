@@ -171,7 +171,7 @@ def embed_image(path):
         return ""
     candidate = path
     if not os.path.isabs(candidate):
-        candidate = os.path.join(os.path.dirname(config_path), candidate)
+        candidate = os.path.abspath(candidate)
     if not os.path.isfile(candidate):
         return ""
     mime = mimetypes.guess_type(candidate)[0] or "application/octet-stream"
@@ -368,7 +368,7 @@ if not isinstance(panels, list) or not panels:
 
 org = report_config.get("orgName") or config.get("projectName") or "Assay BI Toolkit"
 accent = clean_accent(report_config.get("accentColor"))
-footer = report_config.get("footer") or report_config.get("confidentialityLine") or "Confidential - share only with the approved audience."
+footer = report_config.get("footer") or "Confidential - share only with the approved audience."
 logo_uri = embed_image(report_config.get("logoPath"))
 title = data["title"].strip()
 audience = data["audience"].strip()

@@ -13,10 +13,11 @@ The current repo verifies these data-product behaviors:
 - Stage 10 monitors refreshes and drift.
 - data products require stronger validation and review scoring.
 - `reprocheck` warns strongly when a data product has no `reproCommand`.
-- the dashboard engine renders static HTML dashboards.
-- the decision ledger records `refresh-cadence` decisions.
-
-Some recurring-report support named below is described as part of the toolkit direction but is not fully present as executable scripts in this repo. For exact flags and commands, see `CHANGELOG.md` and `PLAYBOOK.md` as the implementation lands.
+- the report engine and dashboard engine write per-run metric snapshots.
+- `deliverable-diff.sh` compares the current run with the prior run.
+- `driftcheck.sh` checks refresh health and metric drift.
+- `distribution-manifest.sh` writes a local delivery handoff, or withholds it when sensitive data needs sign-off.
+- `metric-catalog.json` and `metric-store.sh` maintain shared metric definitions.
 
 ## Versioning
 
@@ -57,46 +58,87 @@ Recurring reports need a clear change summary:
 - caveats changed;
 - validation status changed.
 
-`deliverable-diff` means a comparison between report versions. I could not verify a `deliverable-diff` script or command in this repo. Purpose: show what changed between the prior delivered file and the current delivered file before the operator sends it. See `CHANGELOG.md` and `PLAYBOOK.md` for exact flags when finalized.
+`deliverable-diff` means a comparison between report versions. The script writes:
 
-How the operator uses it:
+- `diff-<timestamp>.txt`: plain-language change notes;
+- `latest.json`: pointer to the newest snapshot.
 
-```text
-Ask Claude: compare this run to the last delivered run and summarize what changed before I send it.
+The exact command is:
+
+```bash
+bash .claude/workflows/deliverable-diff.sh <analysis-id> <metrics-snapshot-json> <artifact-path> [assay.config.jsonc]
 ```
 
-Claude should look at receipts, output files, and rulings, then produce a plain change note.
+During report or dashboard delivery, the renderer runs this automatically after it writes the new metrics snapshot.
 
 ## Drift And Refresh Monitoring
 
 Drift means numbers move unexpectedly. Refresh means new data arrives for the report.
 
-The repo's playbook includes Stage 10 Monitor / Refresh for DATA PRODUCT work. The current `reprocheck` can run a configured `reproCommand` before delivery.
+The exact command is:
 
-Example config:
+```bash
+bash .claude/workflows/driftcheck.sh <analysis-id> <metrics-snapshot-json> [assay.config.jsonc]
+```
+
+`driftcheck.sh` writes:
+
+- `drift-<timestamp>.txt`: the plain-language monitoring result;
+- `latest-drift.json`: structured drift state for later tools.
+
+The block-vs-warn rule is:
+
+- broken or empty data-product refresh BLOCKS delivery;
+- metric drift WARNS, because a changed number may still be real.
+
+Broken refresh means `refreshOk` is false or `rendererStatus` is failed or error. Empty refresh means `rowCount` is zero or below. Those block only when the spec receipt says the track is `data-product`.
+
+Metric drift compares the new snapshot to the previous `latest.json` snapshot. The config key is:
 
 ```json
-"reproCommand": "bash scripts/build-renewal-scorecard.sh"
+"monitoring": {
+  "defaultTolerance": 0.10,
+  "metrics": {
+    "net_retention": { "tolerance": 0.05, "mode": "relative" },
+    "open_invoice_count": { "tolerance": 10, "mode": "absolute" }
+  }
+}
 ```
 
-What happens during delivery:
-
-```text
-reprocheck: running reproCommand for renewal-scorecard. Reproducibility means re-running work gets the same answer.
-assay-gate-ok:reprocheck
-```
-
-`driftcheck` means a recurring metric movement check. I could not verify a `driftcheck` script or command in this repo. Purpose: compare the new run to expected ranges, prior runs, or thresholds and flag unexpected movement. See `CHANGELOG.md` and `PLAYBOOK.md` for exact flags when finalized.
-
-How the operator uses it:
-
-```text
-Ask Claude: check the refreshed dashboard for metric drift and explain any unexpected movement before delivery.
-```
+Relative tolerance means percent movement from the prior run. Absolute tolerance means raw number movement.
 
 ## Distribution Handoff
 
-Distribution means who receives the report and where it goes. For sensitive data, `datacheck` already requires:
+Distribution means who receives the report and where it goes. A distribution manifest means a delivery handoff record.
+
+The exact command is:
+
+```bash
+bash .claude/workflows/distribution-manifest.sh <analysis-id> <artifact-path> <timestamp> <metrics-snapshot-json> [assay.config.jsonc]
+```
+
+The manifest records:
+
+- audience;
+- channel description;
+- cadence;
+- data classification;
+- data-safety receipt path, when present;
+- local send status.
+
+The config key is:
+
+```json
+"distribution": {
+  "audience": "finance leaders",
+  "channelDescription": "email to finance-leaders",
+  "cadence": "monthly after finance close"
+}
+```
+
+Sensitive-data distribution is withheld when sensitive data lacks data-safety sign-off. Withheld means no distribution manifest is written. Sensitive data means personal identifying info, health info, payroll, or customer records.
+
+For sensitive data, `datacheck` requires:
 
 - delivery audience;
 - whether data leaves the company;
@@ -104,33 +146,41 @@ Distribution means who receives the report and where it goes. For sensitive data
 - row-level or aggregate detail;
 - operator sign-off.
 
-A distribution manifest means a delivery handoff record. I could not verify a distribution-manifest script or exact schema in this repo. Purpose: record who gets the recurring report, where it is published, who owns refresh issues, and what to do when validation fails. See `CHANGELOG.md` and `PLAYBOOK.md` for exact flags when finalized.
-
-How the operator uses it:
-
-```text
-Ask Claude: prepare the distribution handoff for this recurring report: audience, destination, owner, refresh timing, and failure contact.
-```
-
 ## Living Metric Store
 
 A living metric store means maintained metric definitions. It prevents "renewal revenue" from changing meaning across runs.
 
-The repo verifies supporting pieces:
-
-- `sourceOfTruth` in `assay.config.jsonc`;
-- `semantic-model-builder` skill;
-- `data-catalog-entry` skill;
-- decision ledger for methodology rulings;
-- `analysis-documentation` skill.
-
-I could not verify a single executable "living metric store" command or file contract in this repo. Purpose: keep current metric definitions, owners, source-of-truth, tolerances, and known caveats in one maintained place. See `CHANGELOG.md` and `PLAYBOOK.md` for exact flags when finalized.
-
-How the operator uses it:
+The shared file is:
 
 ```text
-Ask Claude: update the metric definition record for renewal revenue with the approved Finance definition and source-of-truth.
+metric-catalog.json
 ```
+
+The path comes from `metricCatalogPath` in `assay.config.jsonc`. If that is not set, the default is `metric-catalog.json`.
+
+`metric-store.sh` manages the catalog:
+
+```bash
+bash .claude/workflows/metric-store.sh add <name> <definition> <sourceOfTruth> <owner> <format> [notes]
+bash .claude/workflows/metric-store.sh get <name>
+bash .claude/workflows/metric-store.sh list
+bash .claude/workflows/metric-store.sh check <name> <definition>
+```
+
+What each command does:
+
+- `add`: creates or updates one metric definition.
+- `get`: prints one metric definition.
+- `list`: prints the known metrics.
+- `check`: compares a proposed definition to the catalog.
+
+During `/assay spec`, Claude checks each proposed metric against the catalog:
+
+- `metric-store:match`: use the catalog definition.
+- `metric-store:not-found`: ask whether to add the metric before continuing.
+- `metric-store:differs`: escalate as drift, meaning definitions split across analyses.
+
+The catalog is a shared definition record. It does not replace validation against source systems.
 
 ## Recurring Report Checklist
 
@@ -143,5 +193,5 @@ Before a data product is delivered, confirm:
 - sensitive-data handling is recorded;
 - `reproCommand` is set or the warning is accepted;
 - validation and adversarial review receipts exist;
-- distribution handoff is clear.
-
+- metric definitions are checked against `metric-catalog.json`;
+- distribution handoff is clear, or sensitive-data withholding is expected.

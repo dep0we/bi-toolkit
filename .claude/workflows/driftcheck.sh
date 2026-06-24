@@ -161,7 +161,7 @@ def tolerance_for(config, metric):
     if not isinstance(monitoring, dict):
         monitoring = {}
     default = monitoring.get("defaultTolerance", 0.1)
-    per_metric = monitoring.get("metrics") or monitoring.get("perMetricTolerance") or {}
+    per_metric = monitoring.get("metrics") or {}
     value = per_metric.get(metric, default) if isinstance(per_metric, dict) else default
     mode = "relative"
     if isinstance(value, dict):

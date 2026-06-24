@@ -227,12 +227,12 @@ def score_block(value):
             rows.append(f"<tr><th>{esc(key)}</th><td>{esc(val)}</td></tr>")
     return "<table><tbody>" + "\n".join(rows) + "</tbody></table>" if rows else '<p class="empty">Not provided.</p>'
 
-def embed_image(path):
+def embed_image(path, base_dir=None):
     if not path:
         return ""
     candidate = path
     if not os.path.isabs(candidate):
-        candidate = os.path.join(os.path.dirname(source_path), candidate)
+        candidate = os.path.join(base_dir, candidate) if base_dir else os.path.abspath(candidate)
     if not os.path.isfile(candidate):
         return ""
     mime = mimetypes.guess_type(candidate)[0] or "application/octet-stream"
@@ -247,7 +247,7 @@ def figures_block(items):
             title = item.get("title") or item.get("label") or "Figure"
             desc = item.get("description") or item.get("detail") or ""
             alt = item.get("alt") or desc or title
-            uri = item.get("dataUri") or embed_image(item.get("imagePath") or item.get("path"))
+            uri = item.get("dataUri") or embed_image(item.get("imagePath") or item.get("path"), os.path.dirname(source_path))
             rows.append("<figure>")
             if uri:
                 rows.append(f'<img src="{esc(uri)}" alt="{esc(alt)}" />')
@@ -271,7 +271,7 @@ if not isinstance(conclusion, str) or not conclusion.strip():
 
 org = report_config.get("orgName") or config.get("projectName") or "Assay BI Toolkit"
 accent = clean_accent(report_config.get("accentColor"))
-footer = report_config.get("footer") or report_config.get("confidentialityLine") or "Confidential - share only with the approved audience."
+footer = report_config.get("footer") or "Confidential - share only with the approved audience."
 logo_uri = embed_image(report_config.get("logoPath"))
 audience = data.get("audience") or ""
 generated = data.get("generatedAt") or timestamp

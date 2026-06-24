@@ -8,6 +8,8 @@ Previous: [Troubleshooting FAQ](11-troubleshooting-faq.md) | [Index](README.md)
 
 **A/B test**: comparison between two versions.
 
+**Absolute tolerance**: allowed raw-number movement.
+
 **Acceptance criteria**: conditions required before work is done.
 
 **Active analysis**: saved work to resume first.
@@ -192,7 +194,11 @@ Previous: [Troubleshooting FAQ](11-troubleshooting-faq.md) | [Index](README.md)
 
 **Metric**: number used for decisions.
 
+**Metric catalog**: shared metric definition file.
+
 **Metric definition**: exact calculation rule.
+
+**Metric store**: maintained metric definition workflow.
 
 **Methodology**: chosen analysis approach.
 
@@ -257,6 +263,8 @@ Previous: [Troubleshooting FAQ](11-troubleshooting-faq.md) | [Index](README.md)
 **Reconciliation**: source comparison with explained variance.
 
 **Refresh**: new data arrives.
+
+**Relative tolerance**: allowed percent movement.
 
 **Refresh cadence**: how often data updates.
 
@@ -353,4 +361,3 @@ Previous: [Troubleshooting FAQ](11-troubleshooting-faq.md) | [Index](README.md)
 ## Z
 
 **Zero exit**: command ended successfully.
-
