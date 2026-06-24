@@ -367,6 +367,13 @@ PY
 
 pdf_note=""
 pdf_path=""
+SNAPSHOT="$OUT_DIR/metrics-$TIMESTAMP.json"
+DRIFT_STATUS=""
+DRIFT_SUMMARY=""
+DRIFT_STATE=""
+DIFF_PATH=""
+DISTRIBUTION_MANIFEST=""
+DISTRIBUTION_WITHHELD=""
 
 want_pdf() {
   python3 - "$CONFIG" <<'PY'
@@ -453,11 +460,140 @@ else
   pdf_note="PDF skipped because report.outputFormats does not include pdf. PDF means print-ready file for sharing."
 fi
 
-python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" "$pdf_path" "$pdf_note" > "$RECEIPT_PAYLOAD" <<'PY'
+python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" "$SNAPSHOT" <<'PY'
+import json
+import math
+import re
+import sys
+
+analysis_id, timestamp, source_path, artifact_path, snapshot_path = sys.argv[1:6]
+
+def load(path):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data if isinstance(data, dict) else {}
+
+def number(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().replace(",", "").replace("$", "").replace("%", "")
+        try:
+            parsed = float(cleaned)
+        except ValueError:
+            return None
+        return parsed if math.isfinite(parsed) else None
+    return None
+
+def metric_name(item, fallback):
+    if isinstance(item, dict):
+        for key in ("metric", "name", "label", "title"):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return fallback
+
+def add_metric(metrics, name, value):
+    if not name:
+        return
+    if isinstance(value, dict):
+        raw = value.get("value")
+    else:
+        raw = value
+    parsed = number(raw)
+    if parsed is not None:
+        metrics[name] = parsed
+    elif isinstance(raw, str) and raw.strip():
+        metrics[name] = raw.strip()
+
+def extract_metrics(data):
+    metrics = {}
+    raw = data.get("keyMetrics") or data.get("metrics")
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            add_metric(metrics, str(key), value)
+    elif isinstance(raw, list):
+        for index, item in enumerate(raw, start=1):
+            if isinstance(item, dict):
+                add_metric(metrics, metric_name(item, f"metric-{index}"), item.get("value", item.get("result")))
+            else:
+                add_metric(metrics, f"metric-{index}", item)
+    evidence = data.get("evidence")
+    if isinstance(evidence, list):
+        for item in evidence:
+            if isinstance(item, dict) and any(k in item for k in ("metric", "value", "result")):
+                add_metric(metrics, metric_name(item, ""), item.get("value", item.get("result", item.get("detail"))))
+    return metrics
+
+def extract_findings(data):
+    raw = data.get("keyFindings") or data.get("findings") or []
+    out = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                title = str(item.get("title") or item.get("label") or "Finding").strip()
+                detail = str(item.get("detail") or item.get("summary") or item.get("description") or "").strip()
+                out.append(f"{title}: {detail}" if detail else title)
+            elif str(item).strip():
+                out.append(str(item).strip())
+    return out
+
+def extract_row_count(data):
+    for key in ("rowCount", "rows", "recordCount"):
+        value = data.get(key)
+        parsed = number(value)
+        if parsed is not None:
+            return int(parsed)
+    refresh = data.get("refresh") if isinstance(data.get("refresh"), dict) else {}
+    parsed = number(refresh.get("rowCount"))
+    if parsed is not None:
+        return int(parsed)
+    return None
+
+data = load(source_path)
+refresh = data.get("refresh") if isinstance(data.get("refresh"), dict) else {}
+snapshot = {
+    "schemaVersion": "assay-metrics-snapshot/v1",
+    "analysisId": analysis_id,
+    "timestamp": timestamp,
+    "artifactType": "report",
+    "artifactPath": artifact_path,
+    "sourcePath": source_path,
+    "audience": data.get("audience"),
+    "cadence": data.get("cadence") or data.get("refreshCadence"),
+    "rowCount": extract_row_count(data),
+    "refreshOk": data.get("refreshOk", refresh.get("ok", True)),
+    "rendererStatus": "ok",
+    "metrics": extract_metrics(data),
+    "findings": extract_findings(data),
+}
+with open(snapshot_path, "w", encoding="utf-8") as f:
+    json.dump(snapshot, f, indent=2)
+    f.write("\n")
+PY
+
+DRIFT_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/driftcheck.sh" "$ID" "$SNAPSHOT" "$CONFIG")"
+DRIFT_STATUS="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-status://p')"
+DRIFT_SUMMARY="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-summary://p')"
+DRIFT_STATE="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-state://p')"
+printf '%s\n' "$DRIFT_OUTPUT"
+
+DIFF_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/deliverable-diff.sh" "$ID" "$SNAPSHOT" "$HTML" "$CONFIG")"
+DIFF_PATH="$(printf '%s\n' "$DIFF_OUTPUT" | sed -n 's/^assay-deliverable-diff://p')"
+printf '%s\n' "$DIFF_OUTPUT"
+
+DISTRIBUTION_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/distribution-manifest.sh" "$ID" "$HTML" "$TIMESTAMP" "$SNAPSHOT" "$CONFIG" 2>&1)"
+DISTRIBUTION_MANIFEST="$(printf '%s\n' "$DISTRIBUTION_OUTPUT" | sed -n 's/^assay-distribution-manifest://p')"
+DISTRIBUTION_WITHHELD="$(printf '%s\n' "$DISTRIBUTION_OUTPUT" | sed -n 's/^assay-distribution-withheld://p')"
+printf '%s\n' "$DISTRIBUTION_OUTPUT"
+
+python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" "$pdf_path" "$pdf_note" "$SNAPSHOT" "$DIFF_PATH" "$DRIFT_STATUS" "$DRIFT_SUMMARY" "$DRIFT_STATE" "$DISTRIBUTION_MANIFEST" "$DISTRIBUTION_WITHHELD" > "$RECEIPT_PAYLOAD" <<'PY'
 import json
 import sys
 
-analysis_id, timestamp, source, html_path, pdf_path, pdf_note = sys.argv[1:7]
+analysis_id, timestamp, source, html_path, pdf_path, pdf_note, snapshot_path, diff_path, drift_status, drift_summary, drift_state, distribution_manifest, distribution_withheld = sys.argv[1:14]
 paths = {"html": html_path}
 if pdf_path:
     paths["pdf"] = pdf_path
@@ -467,7 +603,16 @@ payload = {
     "paths": paths,
     "reportInput": source,
     "pdfNote": pdf_note,
+    "metricsSnapshot": snapshot_path,
+    "diffPath": diff_path,
+    "driftStatus": drift_status,
+    "driftSummary": drift_summary,
+    "driftState": drift_state,
 }
+if distribution_manifest:
+    payload["distributionManifest"] = distribution_manifest
+if distribution_withheld:
+    payload["distributionWithheld"] = distribution_withheld
 print(json.dumps(payload, indent=2))
 PY
 

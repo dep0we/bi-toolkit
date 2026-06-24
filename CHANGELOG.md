@@ -6,6 +6,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Production Bundle 3 recurring-report ops: report and dashboard delivery now
+  record per-run metric snapshots, write plain-language deliverable diffs,
+  maintain a latest pointer, run drift monitoring for data products, and emit
+  local distribution manifests with audience, cadence, channel, classification,
+  and issue #8 send deferral.
 - Production Bundle 2 dashboard engine: `/assay deliver` can now render a
   self-contained static HTML dashboard from the documented
   `assay-dashboard/v1` JSON contract, using inline SVG charts for KPI, bar,

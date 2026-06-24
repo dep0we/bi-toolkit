@@ -38,6 +38,24 @@
   // gets the same answer.
   "reproCommand": "",
 
+  "monitoring": {
+    // Drift means a metric moved beyond the allowed tolerance. Relative tolerance
+    // compares percentage movement against the prior run.
+    "defaultTolerance": 0.10,
+    "metrics": {
+      // "net_retention": { "tolerance": 0.05, "mode": "relative" },
+      // "open_invoice_count": { "tolerance": 10, "mode": "absolute" }
+    }
+  },
+
+  "distribution": {
+    // This is a local handoff only. Real email, Slack, or BI-tool sending is
+    // deferred to issue #8 because each environment has different channels.
+    "audience": "finance leaders",
+    "channelDescription": "email to finance-leaders",
+    "cadence": "monthly after finance close"
+  },
+
   // Governing docs are rule files the model may not rewrite during analysis.
   // govcheck snapshots these at discovery, then blocks delivery if any changed.
   "governingDocs": ["CLAUDE.md", "methodology.md", "docs/DECISIONS.md", "docs/spec/assay-spec.md"],

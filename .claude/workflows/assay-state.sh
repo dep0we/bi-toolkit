@@ -54,8 +54,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
 RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 RULINGS_DIR="$(assay_config_path rulingsDir "${ASSAY_RULINGS_DIR:-}" ".assay/rulings" "$CONFIG")"
+DELIVERABLES_DIR="$(assay_config_path deliverablesDir "${ASSAY_DELIVERABLES_DIR:-}" ".assay/deliverables" "$CONFIG")"
 
-python3 - "$MODE" "$ID" "$RECEIPTS_DIR" "$RULINGS_DIR" "$CONFIG" "$SCRIPT_DIR" <<'PY'
+python3 - "$MODE" "$ID" "$RECEIPTS_DIR" "$RULINGS_DIR" "$DELIVERABLES_DIR" "$CONFIG" "$SCRIPT_DIR" <<'PY'
 import datetime
 import hashlib
 import json
@@ -64,7 +65,7 @@ import re
 import subprocess
 import sys
 
-mode, requested_id, receipts_dir, rulings_dir, config_path, script_dir = sys.argv[1:7]
+mode, requested_id, receipts_dir, rulings_dir, deliverables_dir, config_path, script_dir = sys.argv[1:8]
 
 def strip_jsonc(text):
     out = []
@@ -131,6 +132,9 @@ def receipt_path(analysis_id, suffix):
 
 def ruling_path(analysis_id, suffix):
     return os.path.join(rulings_dir, f"{analysis_id}-{suffix}.json")
+
+def deliverable_path(analysis_id, name):
+    return os.path.join(deliverables_dir, analysis_id, name)
 
 def finding(token, message, gate=None, severity="blocker"):
     return {"token": token, "message": message, "gate": gate, "severity": severity}
@@ -206,6 +210,11 @@ def gate_status(script, analysis_id, gate_name):
 
 def data_safety_status(analysis_id):
     return gate_status("datacheck.sh", analysis_id, "datacheck")
+
+def delivery_state(analysis_id):
+    latest, latest_err = load_json(deliverable_path(analysis_id, "latest.json"))
+    drift, drift_err = load_json(deliverable_path(analysis_id, "latest-drift.json"))
+    return latest, latest_err, drift, drift_err
 
 def analyze(analysis_id):
     config = load_jsonc(config_path)
@@ -352,6 +361,36 @@ def analyze(analysis_id):
                 notes.append("WARNING: data product should set reproCommand. Data product means recurring report or dashboard.")
         completed.append("reprocheck policy evaluated")
 
+    latest_delivery, latest_delivery_err, drift, drift_err = delivery_state(analysis_id)
+    if latest_delivery:
+        completed.append("last deliverable run")
+        artifact = latest_delivery.get("artifactPath")
+        timestamp = latest_delivery.get("timestamp")
+        if artifact and timestamp:
+            notes.append(f"last run: {timestamp} at {artifact}")
+    elif latest_delivery_err and latest_delivery_err != "missing":
+        findings.append(finding("invalid-latest-deliverable", "Latest deliverable pointer is not readable JSON. JSON is a structured data file.", "deliverable-diff", "warning"))
+
+    if drift:
+        status = str(drift.get("status") or "").lower()
+        drift_path = drift.get("driftPath")
+        if status == "warning":
+            message = "Last drift check found metric movement beyond tolerance. Drift means a metric moved beyond the allowed tolerance."
+            if drift_path:
+                message += f" See {drift_path}."
+            findings.append(finding("drift-warning", message, "driftcheck", "warning"))
+        elif status == "blocked":
+            message = "Last drift check found a broken or empty refresh. Refresh means the data product updated its data."
+            if drift_path:
+                message += f" See {drift_path}."
+            findings.append(finding("broken-refresh", message, "driftcheck", "blocker"))
+            blocking_gate = blocking_gate or findings[-1]
+            next_step = next_step or f"repair data-product refresh for {analysis_id}"
+        elif status:
+            notes.append(f"last drift check: {status}")
+    elif drift_err and drift_err != "missing":
+        findings.append(finding("invalid-drift-state", "Latest drift state is not readable JSON. JSON is a structured data file.", "driftcheck", "warning"))
+
     if spec_ok and next_step is None:
         next_step = f"/assay deliver {analysis_id}"
 
@@ -376,8 +415,9 @@ def analyze(analysis_id):
 def ids_found():
     ids = set()
     patterns = [
-        (receipts_dir, re.compile(r"^(.+)-(?:spec-receipt|validation-receipt|adversarial-review-receipt|data-safety-receipt|govbaseline)\.json$")),
+        (receipts_dir, re.compile(r"^(.+)-(?:spec-receipt|validation-receipt|adversarial-review-receipt|data-safety-receipt|deliverable-receipt|govbaseline)\.json$")),
         (rulings_dir, re.compile(r"^(.+)-(?:latest-discovery|rulings)\.json$")),
+        (deliverables_dir, re.compile(r"^(.+)$")),
     ]
     for directory, pattern in patterns:
         try:

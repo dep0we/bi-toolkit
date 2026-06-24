@@ -36,7 +36,14 @@ DELIVERABLES_DIR="$(assay_config_path deliverablesDir "${ASSAY_DELIVERABLES_DIR:
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT_DIR="$DELIVERABLES_DIR/$ID"
 HTML="$OUT_DIR/dashboard-$TIMESTAMP.html"
+SNAPSHOT="$OUT_DIR/metrics-$TIMESTAMP.json"
 RECEIPT_PAYLOAD="$(mktemp "${TMPDIR:-/tmp}/assay-dashboard-deliverable-receipt.XXXXXX")"
+DRIFT_STATUS=""
+DRIFT_SUMMARY=""
+DRIFT_STATE=""
+DIFF_PATH=""
+DISTRIBUTION_MANIFEST=""
+DISTRIBUTION_WITHHELD=""
 
 cleanup() {
   rm -f "$RECEIPT_PAYLOAD"
@@ -471,18 +478,131 @@ with open(html_path, "w", encoding="utf-8") as f:
     f.write("\n")
 PY
 
-python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" > "$RECEIPT_PAYLOAD" <<'PY'
+python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" "$SNAPSHOT" <<'PY'
+import json
+import math
+import sys
+
+analysis_id, timestamp, source, html_path, snapshot_path = sys.argv[1:6]
+
+def load(path):
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return data if isinstance(data, dict) else {}
+
+def number(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().replace(",", "").replace("$", "").replace("%", "")
+        try:
+            parsed = float(cleaned)
+        except ValueError:
+            return None
+        return parsed if math.isfinite(parsed) else None
+    return None
+
+def add_metric(metrics, name, value):
+    if not name:
+        return
+    parsed = number(value)
+    if parsed is not None:
+        metrics[name] = parsed
+    elif isinstance(value, str) and value.strip():
+        metrics[name] = value.strip()
+
+def row_count_from_table(panel):
+    data = panel.get("data") if isinstance(panel.get("data"), dict) else {}
+    rows = data.get("rows")
+    return len(rows) if isinstance(rows, list) else 0
+
+data = load(source)
+metrics = {}
+table_rows = 0
+for panel in data.get("panels", []):
+    if not isinstance(panel, dict):
+        continue
+    panel_data = panel.get("data") if isinstance(panel.get("data"), dict) else {}
+    title = str(panel.get("title") or "").strip()
+    if panel.get("type") == "kpi":
+        add_metric(metrics, str(panel_data.get("label") or title).strip(), panel_data.get("value", panel.get("value")))
+    elif panel.get("type") in {"bar", "line"} and isinstance(panel_data, dict):
+        values = panel_data.get("values")
+        points = panel_data.get("points")
+        if isinstance(values, list) and values:
+            add_metric(metrics, f"{title} latest", values[-1])
+        elif isinstance(points, list) and points:
+            last = points[-1]
+            if isinstance(last, dict):
+                add_metric(metrics, f"{title} latest", last.get("value", last.get("y")))
+            elif isinstance(last, list) and len(last) >= 2:
+                add_metric(metrics, f"{title} latest", last[1])
+    if panel.get("type") == "table":
+        table_rows += row_count_from_table(panel)
+
+refresh = data.get("refresh") if isinstance(data.get("refresh"), dict) else {}
+row_count = data.get("rowCount", refresh.get("rowCount"))
+if row_count is None and table_rows:
+    row_count = table_rows
+
+snapshot = {
+    "schemaVersion": "assay-metrics-snapshot/v1",
+    "analysisId": analysis_id,
+    "timestamp": timestamp,
+    "artifactType": "dashboard",
+    "artifactPath": html_path,
+    "sourcePath": source,
+    "audience": data.get("audience"),
+    "cadence": data.get("cadence") or data.get("refreshCadence") or data.get("refreshNote"),
+    "rowCount": row_count,
+    "refreshOk": data.get("refreshOk", refresh.get("ok", True)),
+    "rendererStatus": "ok",
+    "metrics": metrics,
+    "findings": [str(data.get("title") or "Dashboard").strip()],
+}
+with open(snapshot_path, "w", encoding="utf-8") as f:
+    json.dump(snapshot, f, indent=2)
+    f.write("\n")
+PY
+
+DRIFT_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/driftcheck.sh" "$ID" "$SNAPSHOT" "$CONFIG")"
+DRIFT_STATUS="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-status://p')"
+DRIFT_SUMMARY="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-summary://p')"
+DRIFT_STATE="$(printf '%s\n' "$DRIFT_OUTPUT" | sed -n 's/^assay-drift-state://p')"
+printf '%s\n' "$DRIFT_OUTPUT"
+
+DIFF_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/deliverable-diff.sh" "$ID" "$SNAPSHOT" "$HTML" "$CONFIG")"
+DIFF_PATH="$(printf '%s\n' "$DIFF_OUTPUT" | sed -n 's/^assay-deliverable-diff://p')"
+printf '%s\n' "$DIFF_OUTPUT"
+
+DISTRIBUTION_OUTPUT="$(ASSAY_CONFIG="$CONFIG" bash "$SCRIPT_DIR/distribution-manifest.sh" "$ID" "$HTML" "$TIMESTAMP" "$SNAPSHOT" "$CONFIG" 2>&1)"
+DISTRIBUTION_MANIFEST="$(printf '%s\n' "$DISTRIBUTION_OUTPUT" | sed -n 's/^assay-distribution-manifest://p')"
+DISTRIBUTION_WITHHELD="$(printf '%s\n' "$DISTRIBUTION_OUTPUT" | sed -n 's/^assay-distribution-withheld://p')"
+printf '%s\n' "$DISTRIBUTION_OUTPUT"
+
+python3 - "$ID" "$TIMESTAMP" "$SOURCE" "$HTML" "$SNAPSHOT" "$DIFF_PATH" "$DRIFT_STATUS" "$DRIFT_SUMMARY" "$DRIFT_STATE" "$DISTRIBUTION_MANIFEST" "$DISTRIBUTION_WITHHELD" > "$RECEIPT_PAYLOAD" <<'PY'
 import json
 import sys
 
-analysis_id, timestamp, source, html_path = sys.argv[1:5]
+analysis_id, timestamp, source, html_path, snapshot_path, diff_path, drift_status, drift_summary, drift_state, distribution_manifest, distribution_withheld = sys.argv[1:12]
 payload = {
     "analysisId": analysis_id,
     "timestamp": timestamp,
     "artifactType": "dashboard",
     "paths": {"html": html_path},
     "dashboardInput": source,
+    "metricsSnapshot": snapshot_path,
+    "diffPath": diff_path,
+    "driftStatus": drift_status,
+    "driftSummary": drift_summary,
+    "driftState": drift_state,
 }
+if distribution_manifest:
+    payload["distributionManifest"] = distribution_manifest
+if distribution_withheld:
+    payload["distributionWithheld"] = distribution_withheld
 print(json.dumps(payload, indent=2))
 PY
 

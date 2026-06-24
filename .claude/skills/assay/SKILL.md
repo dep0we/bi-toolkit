@@ -398,6 +398,10 @@ Report the `assay-report-html`, optional `assay-report-pdf`, and
 `assay-report-receipt` paths from the renderer output. The renderer writes the
 deliverable receipt, meaning saved proof of the delivered report artifact, with
 `receipt.sh` kind `deliverable`; do not hand-write this receipt.
+The renderer also writes a metrics snapshot (saved key numbers from one run),
+runs driftcheck (metric movement beyond tolerance), writes a deliverable diff
+(what changed since the prior run), and emits a local distribution manifest
+(ready-to-send handoff file) when data-safety rules allow it.
 
 For a data-product track, meaning a recurring report or dashboard, and when the
 approved spec asks for a universal dashboard, write a deterministic dashboard
@@ -473,6 +477,22 @@ using `receipt.sh` kind `deliverable`; do not hand-write this receipt. Report
 the `assay-dashboard-html` and `assay-dashboard-receipt` paths from the renderer
 output.
 
+For a data-product track, meaning a recurring report or dashboard, delivery runs:
+
+```bash
+bash .claude/workflows/driftcheck.sh <analysis-id> <metrics-snapshot-json>
+bash .claude/workflows/deliverable-diff.sh <analysis-id> <metrics-snapshot-json> <artifact-path>
+bash .claude/workflows/distribution-manifest.sh <analysis-id> <artifact-path> <timestamp> <metrics-snapshot-json>
+```
+
+Driftcheck is a warning surface when metrics move beyond tolerance (allowed
+movement before review). It blocks only when the refresh is broken or empty for
+a data product. Broken refresh means the recurring data did not update; empty
+refresh means it returned no rows. Distribution manifests are local handoffs
+only; actual email, Slack, or BI-tool sends are deferred to issue #8. Do not
+emit a distribution manifest for sensitive data unless the data-safety receipt
+has operator sign-off.
+
 Tool-specific exports for Power BI / Tableau / Looker / Metabase are future
 work driven by intake. This engine produces the universal static-HTML view.
 
@@ -506,6 +526,8 @@ and rulings directories and reports:
 - which stage receipts exist;
 - which gate would block next;
 - open findings, meaning missing proof or failed scores;
+- last run, meaning the latest delivered artifact path;
+- drift flags, meaning metric movement beyond tolerance;
 - the single next required step.
 
 When no analysis id is provided, list all in-flight analyses found under

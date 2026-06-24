@@ -35,6 +35,9 @@ if $CHECK; then
     ".claude/workflows/receipt.sh" \
     ".claude/workflows/report-render.sh" \
     ".claude/workflows/dashboard-render.sh" \
+    ".claude/workflows/deliverable-diff.sh" \
+    ".claude/workflows/driftcheck.sh" \
+    ".claude/workflows/distribution-manifest.sh" \
     ".claude/workflows/rulings.sh" \
     ".claude/workflows/govcheck.sh" \
     ".claude/workflows/questioncheck.sh" \
@@ -240,7 +243,7 @@ if [ -d "$KIT/.claude/hooks" ]; then
 fi
 merge_governing_hook
 
-for f in config.sh assay-preflight.sh receipt.sh report-render.sh dashboard-render.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh assay-active.sh assay-help.sh decision-ledger.sh; do
+for f in config.sh assay-preflight.sh receipt.sh report-render.sh dashboard-render.sh deliverable-diff.sh driftcheck.sh distribution-manifest.sh rulings.sh govcheck.sh questioncheck.sh validationcheck.sh datacheck.sh reprocheck.sh assay-state.sh assay-active.sh assay-help.sh decision-ledger.sh; do
   copy_file "$KIT/.claude/workflows/$f" "$TARGET/.claude/workflows/$f"
   $DRY_RUN || chmod +x "$TARGET/.claude/workflows/$f"
   say "  installed: .claude/workflows/$f"
