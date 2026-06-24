@@ -6,7 +6,11 @@ set -euo pipefail
 SUBCOMMAND="${1:-}"
 ID="${2:-}"
 ARG3="${3:-}"
-RULINGS_DIR="${ASSAY_RULINGS_DIR:-.assay/rulings}"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RULINGS_DIR="$(assay_config_path rulingsDir "${ASSAY_RULINGS_DIR:-}" ".assay/rulings" "$CONFIG")"
 
 usage() {
   cat >&2 <<'USAGE'
@@ -166,6 +170,77 @@ for path, payload in [
         json.dump(payload, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
+
+def decision_class_for(fork_id, value):
+    explicit = value.get("decisionClass") if isinstance(value, dict) else None
+    allowed = {
+        "metric-definition", "source-of-truth", "cohort-or-window",
+        "null-or-outlier", "statistical-method", "segment-boundary",
+        "refresh-cadence",
+    }
+    if explicit in allowed:
+        return explicit
+    text = fork_id.lower()
+    if "source" in text or "truth" in text:
+        return "source-of-truth"
+    if "cohort" in text or "window" in text or "date" in text:
+        return "cohort-or-window"
+    if "null" in text or "outlier" in text:
+        return "null-or-outlier"
+    if "stat" in text or "method" in text:
+        return "statistical-method"
+    if "segment" in text:
+        return "segment-boundary"
+    if "refresh" in text or "cadence" in text:
+        return "refresh-cadence"
+    return "metric-definition"
+
+def text_field(value, key, default=""):
+    if isinstance(value, dict) and isinstance(value.get(key), str):
+        return value[key].replace("\n", " ").replace("\r", " ").strip()
+    return default
+
+ledger_path = os.path.join(rulings_dir, "decisions.jsonl")
+with open(ledger_path, "a", encoding="utf-8") as ledger:
+    for fork_id in fork_ids:
+        value = rulings.get(fork_id)
+        if isinstance(value, dict):
+            actual = str(value.get("ruling", "")).replace("\n", " ").replace("\r", " ").strip()
+            rationale = text_field(value, "rationale")
+            options = value.get("options") if isinstance(value.get("options"), list) else []
+            recommendation = text_field(value, "recommendation")
+            predicted = text_field(value, "predictedRuling") or None
+            confidence = value.get("predictionConfidence")
+        else:
+            actual = str(value).replace("\n", " ").replace("\r", " ").strip()
+            rationale = ""
+            options = []
+            recommendation = ""
+            predicted = None
+            confidence = None
+        record = {
+            "schemaVersion": 1,
+            "issueId": analysis_id,
+            "issueTitle": str(data.get("issueTitle", "")).replace("\n", " ").replace("\r", " ").strip(),
+            "forkId": fork_id,
+            "domain": data.get("domain") if data.get("domain") in ("analysis", "data-product", "shared") else "analysis",
+            "decisionType": "tier-a",
+            "decisionClass": decision_class_for(fork_id, value),
+            "options": [str(item) for item in options],
+            "recommendation": recommendation,
+            "timestamp": now,
+            "project": str(data.get("project", "")).replace("\n", " ").replace("\r", " ").strip(),
+            "predictedRuling": predicted,
+            "predictionConfidence": confidence if isinstance(confidence, (int, float)) and not isinstance(confidence, bool) else None,
+            "challengeOutcome": value.get("challengeOutcome") if isinstance(value, dict) and value.get("challengeOutcome") in ("agreed", "pushed-back", "unresolved") else None,
+            "challengeReason": text_field(value, "challengeReason") or None,
+            "challengeRan": bool(value.get("challengeRan")) if isinstance(value, dict) else False,
+            "challengeRanCrossFamily": bool(value.get("challengeRanCrossFamily")) if isinstance(value, dict) else False,
+            "actualRuling": actual,
+            "rationale": rationale,
+            "matchScore": value.get("matchScore") if isinstance(value, dict) and value.get("matchScore") in ("exact", "partial", "miss") else None,
+        }
+        ledger.write(json.dumps(record, separators=(",", ":")) + "\n")
 print(f"assay-rulings-written:{dest}")
 PY
     ;;

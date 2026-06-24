@@ -6,7 +6,11 @@ set -euo pipefail
 KIND="${1:-}"
 ID="${2:-}"
 SOURCE="${3:-}"
-RECEIPTS_DIR="${ASSAY_RECEIPTS_DIR:-.assay/receipts}"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 
 usage() {
   echo "receipt.sh: usage: receipt.sh <spec|trivial|validation|adversarial-review|data-safety> <analysis-id> [json-file]" >&2

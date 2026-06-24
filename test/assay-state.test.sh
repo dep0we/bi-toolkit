@@ -34,6 +34,22 @@ write_config_and_doc() {
 JSON
 }
 
+write_config_with_methodology_override() {
+  local dir="$1"
+  printf 'rule: protect this\n' > "$dir/GOV.md"
+  cat > "$dir/assay.config.jsonc" <<'JSON'
+{
+  "governingDocs": ["GOV.md"],
+  "sourceOfTruth": { "retention": "Finance source" },
+  "dataSafety": { "defaultClassification": "internal" },
+  "scoreThresholds": {
+    "defaultMinDimension": 4,
+    "methodologySoundness": 2
+  }
+}
+JSON
+}
+
 write_spec() {
   local dir="$1"
   mkdir -p "$dir/.assay/receipts"
@@ -104,6 +120,42 @@ JSON
 JSON
 }
 
+write_validation_and_passing_review() {
+  local dir="$1"
+  mkdir -p "$dir/.assay/receipts"
+  cat > "$dir/.assay/receipts/retention-q2-validation-receipt.json" <<'JSON'
+{
+  "kind": "validation",
+  "reconciled": true,
+  "reconciliation": {
+    "retention": "Compared to finance source."
+  }
+}
+JSON
+  cat > "$dir/.assay/receipts/retention-q2-adversarial-review-receipt.json" <<'JSON'
+{
+  "kind": "adversarial-review",
+  "scores": {
+    "confidence": 4,
+    "dataCompleteness": 4,
+    "methodologySoundness": 4,
+    "reproducibility": 4
+  }
+}
+JSON
+}
+
+write_incomplete_data_safety() {
+  local dir="$1"
+  mkdir -p "$dir/.assay/receipts"
+  cat > "$dir/.assay/receipts/retention-q2-data-safety-receipt.json" <<'JSON'
+{
+  "kind": "data-safety",
+  "dataClassification": "internal"
+}
+JSON
+}
+
 snapshot_gov() {
   local dir="$1"
   (cd "$dir" && bash "$KIT/.claude/workflows/govcheck.sh" snapshot retention-q2 >/dev/null 2>&1)
@@ -122,6 +174,37 @@ if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q 'next required step: record
   pass "computes next step for partial analysis with missing rulings"
 else
   fail "expected missing-rulings next step (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/assay-state.XXXXXX")"
+write_config_with_methodology_override "$T"
+write_spec "$T"
+snapshot_gov "$T"
+write_discovery "$T"
+write_rulings "$T"
+write_validation_and_low_review "$T"
+run_state "$T" finish retention-q2
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q 'next required step: /assay deliver retention-q2'; then
+  pass "finish uses the same per-dimension threshold override as validationcheck"
+else
+  fail "expected finish to honor per-dimension threshold override (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/assay-state.XXXXXX")"
+write_config_and_doc "$T"
+write_spec "$T"
+snapshot_gov "$T"
+write_discovery "$T"
+write_rulings "$T"
+write_validation_and_passing_review "$T"
+write_incomplete_data_safety "$T"
+run_state "$T" finish retention-q2
+if [ "$RC" -eq 0 ] && printf '%s\n' "$OUT" | grep -q 'assay-finish-blocked:incomplete-data-safety' && ! printf '%s\n' "$OUT" | grep -q 'next required step: /assay deliver retention-q2'; then
+  pass "finish reflects datacheck when data-safety receipt is incomplete"
+else
+  fail "expected finish to stop at datacheck (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
 rm -rf "$T"
 

@@ -30,7 +30,7 @@ by default.
 | 6 | Execute | Shared | Run the analysis or build the report using the locked decisions. Delegate profiling, counting, and queries to worker sub-agents. | `questioncheck` |
 | 7 | Validate | Shared | Reconcile results to source-of-truth, meaning numbers match the official source or differences are explained. Use the `reconciler` sub-agent; do not self-check. | Required before Stage 9 |
 | 8 | Review + Score | Shared | Red-team the conclusion with a fresh `red-teamer` sub-agent that did not produce the numbers. Score confidence, completeness, methodology, and reproducibility. | Required for every non-trivial analysis (not approved as too small to gate) |
-| 9 | Deliver | Shared | Package the answer, charts, caveats, and next steps for the audience. | `validationcheck` + `datacheck` |
+| 9 | Deliver | Shared | Package the answer, charts, caveats, and next steps for the audience. | `validationcheck` + `govcheck` + `datacheck` + `reprocheck` |
 | 10 | Monitor | Data Product | Check refreshes and metric drift, meaning numbers move unexpectedly. | - |
 | 11 | Document | Shared | Record assumptions, queries, decisions, and validation notes. | - |
 | 12 | Retro | Shared | Capture lessons for the next analysis. | - |

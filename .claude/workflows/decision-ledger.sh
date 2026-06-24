@@ -11,7 +11,7 @@
 # Naming rule: no code-specific words (review, build, PR, diff) in subcommand names.
 # Domain-neutral subcommands: query, match-rate, list, append.
 #
-# Ledger location: .assay/rulings/decisions.jsonl
+# Ledger location: <rulingsDir>/decisions.jsonl, default .assay/rulings/decisions.jsonl
 # Schema version: 1
 #
 # Schema (schemaVersion 1) — fields per JSONL record:
@@ -62,7 +62,12 @@
 set -euo pipefail
 
 SUBCOMMAND="${1:-}"
-LEDGER="${LEDGER_PATH:-.assay/rulings/decisions.jsonl}"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RULINGS_DIR="$(assay_config_path rulingsDir "${ASSAY_RULINGS_DIR:-}" ".assay/rulings" "$CONFIG")"
+LEDGER="${LEDGER_PATH:-$RULINGS_DIR/decisions.jsonl}"
 
 # Pick a JSON runner once.
 # Validation runner (for record writes): python3, else node. jq is intentionally
@@ -923,7 +928,7 @@ Subcommands:
                                    List all records (optional filters)
   append     <json-file>           (trusted /assay skill only) Append one ledger record
 
-Ledger: .assay/rulings/decisions.jsonl (gitignored runtime state)
+Ledger: <rulingsDir>/decisions.jsonl (gitignored runtime state)
 
 Examples (per AC #3 and AC #4):
   bash .claude/workflows/decision-ledger.sh query --issue 32

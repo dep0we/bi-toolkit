@@ -48,15 +48,23 @@ case "$ID" in
     ;;
 esac
 
-python3 - "$MODE" "$ID" "${ASSAY_RECEIPTS_DIR:-.assay/receipts}" "${ASSAY_RULINGS_DIR:-.assay/rulings}" "assay.config.jsonc" <<'PY'
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+CONFIG="${ASSAY_CONFIG:-assay.config.jsonc}"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
+RULINGS_DIR="$(assay_config_path rulingsDir "${ASSAY_RULINGS_DIR:-}" ".assay/rulings" "$CONFIG")"
+
+python3 - "$MODE" "$ID" "$RECEIPTS_DIR" "$RULINGS_DIR" "$CONFIG" "$SCRIPT_DIR" <<'PY'
 import datetime
 import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 
-mode, requested_id, receipts_dir, rulings_dir, config_path = sys.argv[1:6]
+mode, requested_id, receipts_dir, rulings_dir, config_path, script_dir = sys.argv[1:7]
 
 def strip_jsonc(text):
     out = []
@@ -175,56 +183,29 @@ def current_fingerprint(path):
             h.update(chunk)
     return {"path": path, "exists": True, "sha256": h.hexdigest()}
 
-def data_safety_status(analysis_id, spec, config):
-    receipt, err = load_json(receipt_path(analysis_id, "data-safety-receipt"))
-    if str(spec.get("kind", "")).lower() == "trivial" and receipt is None:
+def gate_status(script, analysis_id, gate_name):
+    result = subprocess.run(
+        ["bash", os.path.join(script_dir, script), analysis_id, config_path],
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode == 0:
         return True, None
+    combined = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    match = re.search(r"assay-gate-failed:([A-Za-z0-9._-]+)", combined)
+    token = match.group(1) if match else "gate-error"
+    message = ""
+    for line in result.stderr.splitlines():
+        if ":" in line:
+            message = line.split(":", 1)[1].strip()
+            if message:
+                break
+    if not message:
+        message = f"{gate_name} blocked this analysis."
+    return False, finding(token, message, gate_name)
 
-    def clean(value):
-        raw = str(value or "").strip()
-        aliases = {
-            "pii": "sensitive-PII",
-            "sensitive-pii": "sensitive-PII",
-            "phi": "sensitive-PHI",
-            "sensitive-phi": "sensitive-PHI",
-            "customer records": "customer",
-            "customer-records": "customer",
-            "non-sensitive": "none",
-            "nonsensitive": "none",
-        }
-        return aliases.get(raw.lower(), raw)
-
-    def has_sensitive(obj):
-        if not isinstance(obj, dict):
-            return False
-        keys = ("containsSensitiveData", "sensitiveData", "sensitive", "sensitiveFlags", "sensitiveDataFlags", "hasPII", "hasPHI", "hasPayroll", "hasCustomerRecords")
-        for key in keys:
-            value = obj.get(key)
-            if value is True:
-                return True
-            if isinstance(value, str) and value.strip().lower() in {"true", "yes", "sensitive", "pii", "phi", "payroll", "customer"}:
-                return True
-        return False
-
-    data_safety = config.get("dataSafety") if isinstance(config.get("dataSafety"), dict) else {}
-    default_class = clean(data_safety.get("defaultClassification", ""))
-    spec_class = clean(spec.get("dataClassification") or spec.get("classification") or spec.get("dataSafetyClassification") or default_class)
-    sensitive = {"sensitive-PII", "sensitive-PHI", "payroll", "customer"}
-    unknown = {"", "unset", "unknown", "tbd", "todo", "null", "none-set"}
-
-    if receipt is None:
-        if spec_class in sensitive or has_sensitive(spec):
-            return False, finding("missing-data-safety", "Missing data-safety receipt. Data-safety means audience and handling proof.", "datacheck")
-        if spec_class in {"none", "internal"}:
-            return True, None
-        if spec_class.lower() in unknown:
-            return False, finding("unknown-classification", "Data classification is unset. Classification means how sensitive the data is.", "datacheck")
-        return False, finding("invalid-classification", "Data classification is not recognized.", "datacheck")
-    if err and err != "missing":
-        return False, finding("invalid-data-safety", "Data-safety receipt is not readable JSON. JSON is a structured data file.", "datacheck")
-    if not isinstance(receipt, dict) or receipt.get("kind") != "data-safety":
-        return False, finding("invalid-data-safety", "Data-safety receipt has the wrong kind.", "datacheck")
-    return True, None
+def data_safety_status(analysis_id):
+    return gate_status("datacheck.sh", analysis_id, "datacheck")
 
 def analyze(analysis_id):
     config = load_jsonc(config_path)
@@ -312,65 +293,47 @@ def analyze(analysis_id):
             else:
                 completed.append("methodology rulings")
 
-    validation, validation_err = load_json(receipt_path(analysis_id, "validation-receipt"))
-    review, review_err = load_json(receipt_path(analysis_id, "adversarial-review-receipt"))
     if spec_ok and latest is not None and next_step is None:
-        if validation is None:
-            findings.append(finding("missing-validation", "Missing Stage 7 validation receipt. Validation means proof the numbers were checked.", "validationcheck"))
-            next_step = f"/assay validate {analysis_id}"
-        elif validation_err and validation_err != "missing":
-            findings.append(finding("invalid-validation", "Validation receipt is not readable JSON. JSON is a structured data file.", "validationcheck"))
-            blocking_gate = findings[-1]
-            next_step = f"/assay validate {analysis_id}"
-        elif validation.get("kind") != "validation" or not validation.get("reconciliation"):
-            findings.append(finding("invalid-validation", "Validation receipt must include reconciliation. Reconciliation means numbers match official source or differences are explained.", "validationcheck"))
-            blocking_gate = findings[-1]
-            next_step = f"/assay validate {analysis_id}"
-        elif validation.get("reconciled") is not True:
-            findings.append(finding("unreconciled", "Validation says the result is unreconciled. Reconciled means checked against official source.", "validationcheck"))
-            blocking_gate = findings[-1]
-            next_step = f"/assay validate {analysis_id}"
-        else:
+        ok, validation_finding = gate_status("validationcheck.sh", analysis_id, "validationcheck")
+        if ok:
             completed.append("Stage 7 validation receipt")
-
-        if next_step is None:
-            high, data_product = high_or_data_product(spec or {})
-            sot = config.get("sourceOfTruth") if isinstance(config.get("sourceOfTruth"), dict) else {}
-            if (high or data_product) and not sot:
-                findings.append(finding("source-of-truth-unconfigured", "High-stakes or data-product work needs sourceOfTruth. Source-of-truth means official place to compare against.", "validationcheck"))
-                blocking_gate = findings[-1]
+            if str((spec or {}).get("kind", "")).lower() != "trivial":
+                completed.append("Stage 8 adversarial review")
+        else:
+            findings.append(validation_finding)
+            blocking_gate = validation_finding
+            if validation_finding["token"] == "source-of-truth-unconfigured":
                 next_step = "/assay intake"
-            elif str((spec or {}).get("kind", "")).lower() != "trivial":
-                if review is None:
-                    findings.append(finding("missing-review", "Missing Stage 8 adversarial-review receipt. Adversarial review means independent attack on the answer.", "validationcheck"))
-                    next_step = f"/assay validate {analysis_id}"
-                elif review_err and review_err != "missing":
-                    findings.append(finding("invalid-review", "Adversarial-review receipt is not readable JSON. JSON is a structured data file.", "validationcheck"))
-                    blocking_gate = findings[-1]
-                    next_step = f"/assay validate {analysis_id}"
-                elif review.get("kind") != "adversarial-review":
-                    findings.append(finding("invalid-review", "Adversarial-review receipt has the wrong kind.", "validationcheck"))
-                    blocking_gate = findings[-1]
-                    next_step = f"/assay validate {analysis_id}"
-                else:
-                    scores = review.get("scores") if isinstance(review.get("scores"), dict) else {}
-                    required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"]
-                    missing_scores = [k for k in required if k not in scores]
-                    threshold = int((config.get("scoreThresholds") or {}).get("defaultMinDimension", 3)) if isinstance(config.get("scoreThresholds"), dict) else 3
-                    low = [k for k in required if not isinstance(scores.get(k), (int, float)) or scores.get(k) < threshold]
-                    if missing_scores:
-                        findings.append(finding("missing-score", "Review is missing scores for " + ", ".join(score_label(k) for k in missing_scores) + ".", "validationcheck"))
-                        blocking_gate = findings[-1]
-                        next_step = f"/assay validate {analysis_id}"
-                    elif low and not (review.get("acceptedBelowThreshold") is True and str(review.get("acceptanceReason", "")).strip()):
-                        findings.append(finding("sub-threshold-score", "Low review score: " + ", ".join(score_label(k) for k in low) + ". Threshold means minimum allowed score.", "validationcheck"))
-                        blocking_gate = findings[-1]
-                        next_step = f"/assay validate {analysis_id}"
-                    else:
-                        completed.append("Stage 8 adversarial review")
+            else:
+                next_step = f"/assay validate {analysis_id}"
 
     if spec_ok and next_step is None:
-        ok, data_finding = data_safety_status(analysis_id, spec or {}, config)
+        gov_result = subprocess.run(
+            ["bash", os.path.join(script_dir, "govcheck.sh"), "check", analysis_id, config_path],
+            text=True,
+            capture_output=True,
+        )
+        if gov_result.returncode == 0:
+            completed.append("governing-doc check")
+        else:
+            combined = "\n".join(part for part in (gov_result.stdout, gov_result.stderr) if part)
+            match = re.search(r"assay-gate-failed:([A-Za-z0-9._-]+)", combined)
+            token = match.group(1) if match else "governing-doc-check-failed"
+            message = ""
+            for line in gov_result.stderr.splitlines():
+                if ":" in line:
+                    message = line.split(":", 1)[1].strip()
+                    if message:
+                        break
+            if not message:
+                message = "Governing-doc check failed. Governing docs are protected rule files."
+            gov_finding = finding(token, message, "govcheck")
+            findings.append(gov_finding)
+            blocking_gate = gov_finding
+            next_step = f"resnapshot governing docs only with operator approval for {analysis_id}"
+
+    if spec_ok and next_step is None:
+        ok, data_finding = data_safety_status(analysis_id)
         if ok:
             completed.append("data-safety gate")
         else:
@@ -388,19 +351,6 @@ def analyze(analysis_id):
             if data_product:
                 notes.append("WARNING: data product should set reproCommand. Data product means recurring report or dashboard.")
         completed.append("reprocheck policy evaluated")
-
-    if spec_ok and next_step is None and gov is not None and not gov_err:
-        changed = []
-        for old in (gov.get("docs", []) if isinstance(gov, dict) else []):
-            path = old.get("path") if isinstance(old, dict) else None
-            if path and current_fingerprint(path) != old:
-                changed.append(path)
-        if changed:
-            findings.append(finding("governing-doc-edit", "Guarded governing docs changed during analysis: " + ", ".join(changed) + ". Guarded docs are protected rule files.", "govcheck"))
-            blocking_gate = findings[-1]
-            next_step = f"resnapshot governing docs only with operator approval for {analysis_id}"
-        else:
-            completed.append("governing-doc check")
 
     if spec_ok and next_step is None:
         next_step = f"/assay deliver {analysis_id}"

@@ -27,8 +27,14 @@ const RESULTS = A.results ?? A.artifacts ?? 'the current result artifacts'
 const CFG = A.config ?? {}
 const PROJECT = CFG.projectName ?? 'this assay project'
 const SOURCE_OF_TRUTH = CFG.sourceOfTruth ?? {}
-const THRESHOLDS = CFG.scoreThresholds ?? { confidence: 3, dataCompleteness: 3, methodologySoundness: 3, reproducibility: 3 }
+const THRESHOLDS = CFG.scoreThresholds ?? { defaultMinDimension: 3 }
 const HIGH_STAKES = A.highStakes ?? false
+
+function thresholdFor (key) {
+  const thresholds = THRESHOLDS && typeof THRESHOLDS === 'object' ? THRESHOLDS : {}
+  const fallback = typeof thresholds.defaultMinDimension === 'number' ? thresholds.defaultMinDimension : 3
+  return typeof thresholds[key] === 'number' ? thresholds[key] : fallback
+}
 
 const PLAIN_LANGUAGE_RULE = `Every operator-facing sentence must define technical or statistical terms inline in 4-8 words, for example "variance (difference from expected value)", and must frame choices by business consequence, not jargon.`
 
@@ -215,10 +221,10 @@ ${PLAIN_LANGUAGE_RULE}`,
 phase('Gate')
 const scores = score?.scores ?? {}
 const belowThreshold = [
-  ['confidence', scores.confidence?.score, THRESHOLDS.confidence ?? 3],
-  ['data-completeness', scores.dataCompleteness?.score, THRESHOLDS.dataCompleteness ?? 3],
-  ['methodology-soundness', scores.methodologySoundness?.score, THRESHOLDS.methodologySoundness ?? 3],
-  ['reproducibility', scores.reproducibility?.score, THRESHOLDS.reproducibility ?? 3],
+  ['confidence', scores.confidence?.score, thresholdFor('confidence')],
+  ['data-completeness', scores.dataCompleteness?.score, thresholdFor('dataCompleteness')],
+  ['methodology-soundness', scores.methodologySoundness?.score, thresholdFor('methodologySoundness')],
+  ['reproducibility', scores.reproducibility?.score, thresholdFor('reproducibility')],
 ].filter(([, actual, threshold]) => typeof actual !== 'number' || actual < threshold)
 
 const blockingFindings = (redTeam?.findings ?? []).filter(f => f.severity === 'P0' || f.severity === 'P1')

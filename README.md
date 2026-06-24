@@ -83,7 +83,9 @@ proof exists.
 | --- | --- | --- |
 | `questioncheck` | Stage 6 execution | A Stage 2 spec receipt. |
 | `validationcheck` | Stage 9 delivery | A validation receipt, plus a passing review score when required. |
+| `govcheck` | Stage 9 delivery | No protected governing docs changed during the analysis. |
 | `datacheck` | Stage 9 delivery | A data-safety receipt when sensitive data is involved. |
+| `reprocheck` | Stage 9 delivery | The optional `reproCommand` exits zero when configured. |
 
 `questioncheck` prevents execution without a spec receipt. The spec receipt
 records the question, metric definitions, valid answer, decision impact, and
@@ -97,8 +99,8 @@ and for DATA PRODUCT work, it also requires a passing adversarial-review receipt
 recorded handling. Sensitive data means personal identifying info (PII), health
 info (PHI), payroll, or customer records.
 
-Receipts are saved proof files under `.assay/receipts/`. The usual receipt files
-are:
+Receipts are saved proof files under `receiptsDir`, defaulting to
+`.assay/receipts/`. The usual receipt files are:
 
 - `<analysis-id>-spec-receipt.json`
 - `<analysis-id>-validation-receipt.json`
@@ -146,6 +148,7 @@ that choice before computing results.
 | `/assay deliver` | Packages the final answer after `validationcheck` passes. |
 | `/assay status` | Shows existing receipts, blocking gates, and the next recommended step. |
 | `/assay resume` | Continues the active analysis from its saved next step. |
+| `/assay ledger` | Lists or queries ruled methodology choices. |
 
 ## 6. The skills
 

@@ -34,6 +34,19 @@ write_config_and_doc() {
 JSON
 }
 
+write_sensitive_config_and_doc() {
+  local dir="$1"
+  printf 'rule: protect this\n' > "$dir/GOV.md"
+  cat > "$dir/assay.config.jsonc" <<'JSON'
+{
+  "governingDocs": ["GOV.md"],
+  "sourceOfTruth": { "retention": "Finance system of record" },
+  "dataSafety": { "defaultClassification": "customer" },
+  "scoreThresholds": { "defaultMinDimension": 3 }
+}
+JSON
+}
+
 write_receipts() {
   local dir="$1"
   mkdir -p "$dir/.assay/receipts"
@@ -112,6 +125,19 @@ if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:governi
   pass "deliver routes to govcheck after validation passes"
 else
   fail "expected deliver governing-doc-edit block (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/assay-preflight.XXXXXX")"
+write_sensitive_config_and_doc "$T"
+run_preflight "$T" discovery retention-q2
+write_receipts "$T"
+printf 'rule: changed during analysis\n' > "$T/GOV.md"
+run_preflight "$T" deliver retention-q2
+if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:governing-doc-edit'; then
+  pass "deliver runs govcheck before datacheck"
+else
+  fail "expected govcheck to block before datacheck (rc=$RC stdout=$OUT stderr=$ERR)"
 fi
 rm -rf "$T"
 

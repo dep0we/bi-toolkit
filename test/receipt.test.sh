@@ -66,6 +66,31 @@ fi
 rm -rf "$T"
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/receipt.XXXXXX")"
+cat > "$T/assay.config.jsonc" <<'JSON'
+{
+  "receiptsDir": "custom-receipts"
+}
+JSON
+(cd "$T" && bash "$WRITER" spec "retention-q2" <<'JSON') >/dev/null
+{
+  "question": "What changed retention in Q2?",
+  "metricDefinitions": {
+    "retention": "active customers this quarter divided by active customers last quarter"
+  },
+  "validAnswer": "A reconciled answer with caveats.",
+  "decisionImpact": "strategy decision",
+  "track": "analysis"
+}
+JSON
+run_question_gate "$T" "retention-q2"
+if [ "$RC" -eq 0 ] && [ -f "$T/custom-receipts/retention-q2-spec-receipt.json" ]; then
+  pass "writer and questioncheck honor receiptsDir from config"
+else
+  fail "expected custom receiptsDir round trip (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/receipt.XXXXXX")"
 (cd "$T" && bash "$WRITER" data-safety "retention-q2" <<'JSON') >/dev/null
 {
   "dataClassification": "customer",
@@ -129,6 +154,7 @@ T="$(mktemp -d "${TMPDIR:-/tmp}/receipt-install.XXXXXX")"
 bash "$INSTALL" "$T" >/dev/null
 missing=()
 for f in \
+  ".claude/workflows/config.sh" \
   ".claude/workflows/assay-preflight.sh" \
   ".claude/workflows/govcheck.sh" \
   ".claude/workflows/datacheck.sh" \

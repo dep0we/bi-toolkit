@@ -19,6 +19,7 @@
 
   "baseBranch": "main",
 
+  // Gate readers and writers use these first, then env vars, then defaults.
   "receiptsDir": ".assay/receipts",
   "rulingsDir": ".assay/rulings",
 
@@ -46,6 +47,11 @@
 
   "scoreThresholds": {
     "defaultMinDimension": 3,
+    // Optional per-dimension overrides. Omit a key to use defaultMinDimension.
+    "confidence": 3,
+    "dataCompleteness": 3,
+    "methodologySoundness": 3,
+    "reproducibility": 3,
     "allowRecordedAcceptance": true
   },
 

@@ -31,7 +31,10 @@ case "$ID" in
     ;;
 esac
 
-RECEIPTS_DIR="${ASSAY_RECEIPTS_DIR:-.assay/receipts}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 
 if command -v python3 >/dev/null 2>&1; then
   python3 - "$MODE" "$ID" "$CONFIG" "$RECEIPTS_DIR" "${ASSAY_GOVCHECK_APPROVED:-}" <<'PY'

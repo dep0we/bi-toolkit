@@ -1,6 +1,6 @@
 ---
 name: assay
-description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: help, intake, frame, spec, discovery, execute, validate, deliver, status, finish, or resume.
+description: Router for the assay BI quality loop. Invoke when the operator types /assay with a subcommand: help, intake, frame, spec, discovery, execute, validate, deliver, status, finish, resume, or ledger.
 ---
 
 # /assay - BI quality loop router
@@ -36,9 +36,9 @@ operator explicitly approves a named exception.
    `/assay intake` or `/assay frame`. Do not lecture; take their hand.
 
 Project-specific rules live in `assay.config.jsonc`. Receipts live in
-`.assay/receipts/`. A receipt is a saved proof file for a completed stage.
-Always write receipts with `.claude/workflows/receipt.sh`; do not hand-write
-the files directly.
+the configured receipts directory, defaulting to `.assay/receipts/`. A receipt
+is a saved proof file for a completed stage. Always write receipts with
+`.claude/workflows/receipt.sh`; do not hand-write the files directly.
 
 The model must not bypass `.claude/workflows/assay-preflight.sh`. A preflight is
 a required gate check before a chokepoint, meaning a named stopping point in
@@ -120,7 +120,7 @@ analysis to resume first.
 
 ### `/assay spec`
 
-Write the Stage 2 spec receipt under `.assay/receipts/` by calling:
+Write the Stage 2 spec receipt with the receipt writer by calling:
 
 ```bash
 bash .claude/workflows/receipt.sh spec <analysis-id> <<'JSON'
@@ -208,8 +208,11 @@ bash .claude/workflows/rulings.sh write <analysis-id> <discoveryRunId> <<'JSON'
 JSON
 ```
 
-This creates `.assay/rulings/<analysis-id>-rulings.json`. A ruling is the
-operator's approved method choice.
+This creates `<rulingsDir>/<analysis-id>-rulings.json`, defaulting to
+`.assay/rulings/<analysis-id>-rulings.json`. A ruling is the operator's
+approved method choice.
+The rulings writer also appends one decision-ledger row for each ruled Tier-A
+fork. The ledger is an audit trail of method choices.
 
 ### `/assay execute`
 
@@ -258,7 +261,7 @@ analysis does NOT satisfy this stage — it cannot catch its own blind spots.
 Invoke `.claude/workflows/assay-validate.js` with the analysis request, Stage 2
 spec receipt, results, and config.
 
-Write the Stage 7 validation receipt under `.assay/receipts/` by passing the
+Write the Stage 7 validation receipt with the receipt writer by passing the
 workflow's `validationReceipt` to:
 
 ```bash
@@ -356,8 +359,8 @@ bash .claude/workflows/assay-state.sh status
 ```
 
 Report the helper output directly in plain language. Status means current saved
-progress and the next required step. The helper reads `.assay/receipts/` and
-`.assay/rulings/` and reports:
+progress and the next required step. The helper reads the configured receipts
+and rulings directories and reports:
 
 - which stage receipts exist;
 - which gate would block next;
@@ -390,7 +393,7 @@ must not bypass any gate. If the next step is:
 - `write data-safety receipt`: collect the audience, handling, destination,
   detail level, and operator sign-off; do not deliver.
 - `/assay deliver <analysis-id>`: call deliver preflight exactly as `/assay
-  deliver` does, including validationcheck, datacheck, reprocheck, and govcheck.
+  deliver` does, including validationcheck, govcheck, datacheck, and reprocheck.
 
 If `assay-state.sh finish` reports a blocking gate, explain it and drive the
 corrective next step only. A gate is a required stop-check before continuing.
@@ -408,15 +411,33 @@ bash .claude/workflows/assay-state.sh resume
 Then continue only from the helper's next required step. If no active analysis
 exists, run `/assay status` or `/assay help`.
 
+### `/assay ledger`
+
+Query the methodology decision ledger, meaning the saved list of ruled forks:
+
+```bash
+bash .claude/workflows/decision-ledger.sh list
+```
+
+If the operator provides a filter, pass it through to the ledger helper:
+
+```bash
+bash .claude/workflows/decision-ledger.sh query --issue <analysis-id>
+bash .claude/workflows/decision-ledger.sh query --fork <fork-id>
+bash .claude/workflows/decision-ledger.sh match-rate
+```
+
+Report the helper output directly in plain language.
+
 ## Receipt Names
 
 Use a stable analysis id such as `revenue-retention-q2`.
 
 Receipt files:
 
-- `.assay/receipts/<analysis-id>-spec-receipt.json`
-- `.assay/receipts/<analysis-id>-validation-receipt.json`
-- `.assay/receipts/<analysis-id>-adversarial-review-receipt.json`
+- `<receiptsDir>/<analysis-id>-spec-receipt.json`
+- `<receiptsDir>/<analysis-id>-validation-receipt.json`
+- `<receiptsDir>/<analysis-id>-adversarial-review-receipt.json`
 
 ## Installed Components
 

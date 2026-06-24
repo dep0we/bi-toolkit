@@ -48,7 +48,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
   BI memory lessons.
 
 ### Changed
+- Delivery preflight now runs validationcheck, govcheck, datacheck, then
+  reprocheck, so cheap blocking checks run before the reproducibility command.
+- Score thresholds now support per-dimension overrides with
+  `defaultMinDimension` fallback across validate, validationcheck, and status.
+- `receiptsDir` and `rulingsDir` in `assay.config.jsonc` now control the gate
+  readers and writers before env-var/default fallback.
 - Updated architecture docs and gitignore rules so this kit source tracks its
   own `.claude` engine files while installed projects ignore runtime receipts.
 
 ### Fixed
+- `/assay finish` and `/assay status` now use the same validation and
+  data-safety gate decisions as delivery, so incomplete data-safety receipts do
+  not appear deliverable.
+- Methodology rulings now append decision-ledger rows, and `/assay ledger`
+  exposes the ledger query helper.

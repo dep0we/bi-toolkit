@@ -10,7 +10,10 @@ if [ -z "$ID" ]; then
 fi
 
 CONFIG="${2:-assay.config.jsonc}"
-RECEIPTS_DIR="${ASSAY_RECEIPTS_DIR:-.assay/receipts}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/config.sh"
+RECEIPTS_DIR="$(assay_config_path receiptsDir "${ASSAY_RECEIPTS_DIR:-}" ".assay/receipts" "$CONFIG")"
 SPEC="$RECEIPTS_DIR/${ID}-spec-receipt.json"
 VALIDATION="$RECEIPTS_DIR/${ID}-validation-receipt.json"
 REVIEW="$RECEIPTS_DIR/${ID}-adversarial-review-receipt.json"
@@ -75,6 +78,17 @@ if not validation.get("reconciliation"):
 
 spec = load_json(spec_path) or {}
 config = load_jsonc(config_path)
+def threshold_for(thresholds, key):
+    if not isinstance(thresholds, dict):
+        return 3
+    default = thresholds.get("defaultMinDimension", 3)
+    if isinstance(default, bool) or not isinstance(default, (int, float)):
+        default = 3
+    value = thresholds.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        value = default
+    return value
+
 kind = str(spec.get("kind", "")).lower()
 impact = " ".join(str(spec.get(k, "")) for k in ("decisionImpact", "highStakesReason")).lower()
 track = str(spec.get("track", "")).lower()
@@ -101,14 +115,13 @@ if needs_review:
         raise SystemExit
 
     thresholds = config.get("scoreThresholds", {}) if isinstance(config, dict) else {}
-    threshold = int(thresholds.get("defaultMinDimension", 3))
     scores = review.get("scores") or {}
     required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"]
     missing = [k for k in required if k not in scores]
     if missing:
         print("missing-score")
         raise SystemExit
-    low = [k for k in required if not isinstance(scores.get(k), (int, float)) or scores.get(k) < threshold]
+    low = [k for k in required if not isinstance(scores.get(k), (int, float)) or scores.get(k) < threshold_for(thresholds, k)]
     if low:
         if review.get("acceptedBelowThreshold") is True and isinstance(review.get("acceptanceReason"), str) and review["acceptanceReason"].strip():
             print("ok" if sot_configured else "ok-warn-sot")
@@ -143,6 +156,12 @@ if (validation.reconciled !== true) { console.log("unreconciled"); process.exit(
 if (!validation.reconciliation) { console.log("missing-reconciliation"); process.exit(0); }
 const spec = load(specPath) || {};
 const config = loadJsonc(configPath);
+function thresholdFor(thresholds, key) {
+  thresholds = thresholds && typeof thresholds === "object" && !Array.isArray(thresholds) ? thresholds : {};
+  let fallback = typeof thresholds.defaultMinDimension === "number" ? thresholds.defaultMinDimension : 3;
+  let value = typeof thresholds[key] === "number" ? thresholds[key] : fallback;
+  return value;
+}
 const kind = String(spec.kind || "").toLowerCase();
 const impact = `${spec.decisionImpact || ""} ${spec.highStakesReason || ""}`.toLowerCase();
 const track = String(spec.track || "").toLowerCase();
@@ -156,11 +175,11 @@ if (needsReview) {
   const review = load(reviewPath);
   if (!review) { console.log("missing-review"); process.exit(0); }
   if (review.kind !== "adversarial-review") { console.log("invalid-review"); process.exit(0); }
-  const threshold = Number((config.scoreThresholds || {}).defaultMinDimension || 3);
+  const thresholds = config.scoreThresholds || {};
   const scores = review.scores || {};
   const required = ["confidence", "dataCompleteness", "methodologySoundness", "reproducibility"];
   if (!required.every((k) => Object.prototype.hasOwnProperty.call(scores, k))) { console.log("missing-score"); process.exit(0); }
-  const low = required.filter((k) => typeof scores[k] !== "number" || scores[k] < threshold);
+  const low = required.filter((k) => typeof scores[k] !== "number" || scores[k] < thresholdFor(thresholds, k));
   if (low.length) {
     if (review.acceptedBelowThreshold === true && typeof review.acceptanceReason === "string" && review.acceptanceReason.trim()) console.log(sotConfigured ? "ok" : "ok-warn-sot");
     else console.log("sub-threshold-score");

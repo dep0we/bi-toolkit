@@ -27,6 +27,7 @@ install_minimal_runtime() {
   local dir="$1"
   mkdir -p "$dir/.claude/hooks" "$dir/.claude/workflows"
   cp "$HOOK" "$dir/.claude/hooks/governing-reminder.sh"
+  cp "$KIT/.claude/workflows/config.sh" "$dir/.claude/workflows/config.sh"
   cp "$KIT/.claude/workflows/assay-state.sh" "$dir/.claude/workflows/assay-state.sh"
   cp "$KIT/.claude/workflows/assay-active.sh" "$dir/.claude/workflows/assay-active.sh"
   cp "$KIT/.claude/workflows/assay-help.sh" "$dir/.claude/workflows/assay-help.sh"

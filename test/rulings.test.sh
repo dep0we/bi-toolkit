@@ -70,6 +70,32 @@ rm -rf "$T"
 
 T="$(mktemp -d "${TMPDIR:-/tmp}/rulings.XXXXXX")"
 write_spec "$T"
+write_complete_rulings "$T" "run-1"
+if [ -f "$T/.assay/rulings/decisions.jsonl" ] && (cd "$T" && bash "$KIT/.claude/workflows/decision-ledger.sh" query --issue retention-q2 >/dev/null 2>&1); then
+  pass "rulings write appends decision-ledger rows"
+else
+  fail "expected rulings write to append queryable ledger rows"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/rulings.XXXXXX")"
+cat > "$T/assay.config.jsonc" <<'JSON'
+{
+  "rulingsDir": "custom-rulings"
+}
+JSON
+write_spec "$T"
+write_complete_rulings "$T" "run-1"
+run_execute "$T"
+if [ "$RC" -eq 0 ] && [ -f "$T/custom-rulings/retention-q2-rulings.json" ] && [ -f "$T/custom-rulings/decisions.jsonl" ]; then
+  pass "rulings writer and execute preflight honor rulingsDir from config"
+else
+  fail "expected custom rulingsDir round trip (rc=$RC stdout=$OUT stderr=$ERR)"
+fi
+rm -rf "$T"
+
+T="$(mktemp -d "${TMPDIR:-/tmp}/rulings.XXXXXX")"
+write_spec "$T"
 run_execute "$T"
 if [ "$RC" -eq 1 ] && printf '%s\n' "$OUT" | grep -qx 'assay-gate-failed:missing-rulings'; then
   pass "missing rulings file blocks execute"
