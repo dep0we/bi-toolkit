@@ -94,36 +94,31 @@ curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh
 
 ### `/assay intake`
 
-Interview the operator and fill in:
+This is the operator's first experience, so run it as a short, friendly
+conversation. **Follow the interview script in `assay-intake.md`** (in this
+skill's folder) exactly — do not improvise a different flow. The full question
+wording, examples, and capture mapping live there.
 
-- BI stack: warehouse, BI tool, query language.
-- Source-of-truth list, meaning the official source for each key metric.
-- Metric catalog entries, meaning shared definitions for key metrics.
-- Validation habit, meaning how numbers are checked.
-- Stakeholders and delivery rules.
-- High-stakes examples, meaning work that drives money, headcount, or strategy.
-- Data classification defaults, meaning whether routine work is none, internal,
-  sensitive-PII (personal identifying info), sensitive-PHI (health info),
-  payroll, or customer records.
-- Approved export destinations, meaning places data may be sent outside the
-  analysis workspace.
+Key rules:
 
-Write or update `assay.config.jsonc` and `CLAUDE.md` only with operator approval.
-For each key metric the operator names, capture it into the metric catalog with:
+- **Open** by saying it takes about **2 minutes**, everything is a **starting
+  baseline that is not locked in and evolves with the project**, and **"skip" is
+  always fine**.
+- **Ask one or two questions at a time**, in plain language, leading with the
+  concrete example on each. Never paste all the questions at once.
+- **Defer the heavy stuff.** Capture only the essentials now — do NOT demand
+  exact metric calculation rules, a full metric catalog, per-analysis data
+  classification, or export destinations. The gates prompt for those lazily,
+  when they actually matter.
+- **At the end:** recap, then (with the operator's OK) write/update
+  `assay.config.jsonc`, seed the metric catalog with each named metric's
+  name + source-of-truth (definition pending first use) via
+  `bash .claude/workflows/metric-store.sh add ...`, and draft `CLAUDE.md` —
+  copying the **Governing rules** section from `CLAUDE.starter.md` verbatim.
+  Then point to `/assay frame`.
 
-```bash
-bash .claude/workflows/metric-store.sh add <metric-name> <definition> <source-of-truth> <owner> <format> [notes]
-```
-
-Definitions must be exact calculation rules. Source-of-truth in
-`assay.config.jsonc` is the older lightweight map used by gates; the metric
-catalog is the richer living record. Keep them aligned, or derive the config map
-from catalog entries during intake. If they disagree, surface the mismatch and
-ask which source should be official.
-
-When drafting `CLAUDE.md`, copy the **Governing rules** section from
-`CLAUDE.starter.md` verbatim, so every future session in this folder routes
-through the loop, validates independently, and delegates mechanical work.
+Keep the config `sourceOfTruth` map and the metric catalog aligned; if they
+disagree, surface it and ask which source is official.
 
 ### `/assay frame`
 
