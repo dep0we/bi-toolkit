@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Redesigned `/assay intake` as a friendly 2-minute interview (dedicated `assay-intake.md` script): opens by saying answers are a baseline that's not locked in and evolves, honors "skip" throughout, asks one or two plain-language questions at a time with examples, reframes Q1 as the project's purpose, and defers heavy items (exact metric rules, export destinations) to lazy capture.
 - Installer now refreshes the written guide into installed projects at
   `docs/guide/`, and `/assay help` plus the starter `CLAUDE.md` point operators
   to the local guide, canonical repo docs, and reinstall command.
