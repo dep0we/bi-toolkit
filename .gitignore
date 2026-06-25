@@ -8,3 +8,4 @@
 .assay/rulings/
 *.local
 *.local.json
+.gstack/

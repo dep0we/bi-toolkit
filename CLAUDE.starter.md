@@ -4,6 +4,19 @@ This file captures how this BI project works. Fill in the project-specific
 sections during `/assay intake`. The "Governing rules" section below is fixed —
 keep it verbatim; it is how the kit protects your numbers.
 
+## Help & Updates
+
+Full written guide: `docs/guide/` in this project (start at
+`docs/guide/README.md`).
+
+Latest features + canonical docs: https://github.com/dep0we/bi-toolkit
+
+To update your toolkit, re-run the install command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh | bash
+```
+
 ## Governing rules — how this project works (keep these verbatim)
 
 These are not optional and apply to **every** analysis (answering with data or

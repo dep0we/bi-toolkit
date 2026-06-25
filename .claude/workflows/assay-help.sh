@@ -60,6 +60,12 @@ Commands:
 /assay frame - start or route one analysis.
 /assay status - see saved progress.
 /assay resume - continue the active analysis.
+
+Help & updates:
+Full written guide: docs/guide/ in this project (start at docs/guide/README.md).
+Latest features + canonical docs: https://github.com/dep0we/bi-toolkit
+To update your toolkit, re-run the install command:
+curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh | bash
 EOF
 
 echo ""

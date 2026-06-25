@@ -53,6 +53,10 @@ if $CHECK; then
     ".claude/workflows/assay-validate.js" \
     ".claude/workflows/lesson-loader.js" \
     ".claude/workflows/decision-ledger.sh" \
+    "docs/guide/README.md" \
+    "docs/guide/00-welcome.md" \
+    "docs/guide/04-workflow.md" \
+    "docs/guide/10-conductor-and-help.md" \
     "assay.config.jsonc" \
     "metric-catalog.json" \
     "data-safety.md"; do
@@ -91,6 +95,33 @@ copy_if_missing() {
     copy_file "$src" "$dest"
     say "  created: $label"
   fi
+}
+
+copy_guide() {
+  local src_dir="$KIT/docs/guide"
+  local dest_dir="$TARGET/docs/guide"
+  if [ ! -d "$src_dir" ]; then
+    say "  skipped: docs/guide/ (source guide not found)"
+    return
+  fi
+  if $DRY_RUN; then
+    say "  [dry-run] refresh docs/guide/*.md"
+    say "  installed: docs/guide/ (local guide starts at docs/guide/README.md)"
+    return
+  fi
+
+  if [ -d "$dest_dir" ] && [ "$(cd "$src_dir" && pwd)" = "$(cd "$dest_dir" && pwd)" ]; then
+    say "  installed: docs/guide/ (local guide starts at docs/guide/README.md)"
+    return
+  fi
+
+  mkdir -p "$dest_dir"
+  rm -f "$dest_dir"/*.md
+  for f in "$src_dir"/*.md; do
+    [ -e "$f" ] || continue
+    copy_file "$f" "$dest_dir/$(basename "$f")"
+  done
+  say "  installed: docs/guide/ (local guide starts at docs/guide/README.md)"
 }
 
 merge_governing_hook() {
@@ -274,6 +305,7 @@ copy_if_missing "$KIT/methodology.md" "$TARGET/methodology.md" "methodology.md"
 copy_if_missing "$KIT/model-dial.md" "$TARGET/model-dial.md" "model-dial.md"
 copy_if_missing "$KIT/claude-md-guide.md" "$TARGET/claude-md-guide.md" "claude-md-guide.md"
 copy_if_missing "$KIT/data-safety.md" "$TARGET/data-safety.md" "data-safety.md"
+copy_guide
 
 if $DRY_RUN; then
   say "  [dry-run] seed memory files"
