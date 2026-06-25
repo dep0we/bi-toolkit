@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/). Versioning: [SemVer](ht
 ## [Unreleased]
 
 ### Added
+- Installer now refreshes the written guide into installed projects at
+  `docs/guide/`, and `/assay help` plus the starter `CLAUDE.md` point operators
+  to the local guide, canonical repo docs, and reinstall command.
 - Production Bundle 4 living metric store: tracked `metric-catalog.json` now
   holds shared metric definitions, `.claude/workflows/metric-store.sh` can add,
   get, list, and compare definitions, `/assay intake` writes key metrics into

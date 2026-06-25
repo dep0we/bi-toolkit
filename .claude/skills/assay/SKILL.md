@@ -82,6 +82,15 @@ bash .claude/workflows/assay-help.sh <analysis-id>
 Report the helper output directly. Help explains what the kit is, the lifecycle
 one stage at a time, and the next required step from `assay-state.sh`. If no
 active analysis or receipts exist, point the operator to `/assay intake`.
+Help output must include:
+
+```text
+Help & updates:
+Full written guide: docs/guide/ in this project (start at docs/guide/README.md).
+Latest features + canonical docs: https://github.com/dep0we/bi-toolkit
+To update your toolkit, re-run the install command:
+curl -fsSL https://raw.githubusercontent.com/dep0we/bi-toolkit/main/bootstrap.sh | bash
+```
 
 ### `/assay intake`
 
